@@ -1,0 +1,150 @@
+{
+  "project_name": "Expiry Detection & Inventory Management System",
+  "theme": "hybrid",
+  "archetype": "Custom Hybrid: Vibrant Play (Archetype 6) & Swiss High-Contrast (Archetype 4)",
+  "rationale": "A confident, flavor-driven brand for marketing & auth surfaces inspired by Barcoop Bevy, coupled with a calm, data-dense, highly operational workspace for the inventory dashboard.",
+  "colors": {
+    "brand": {
+      "primary": "#259E7E",
+      "accent": "#C1D544",
+      "primary_hover": "#1E7D64",
+      "accent_hover": "#A6B83B"
+    },
+    "background": {
+      "dashboard_base": "#FAF9F6",
+      "dashboard_surface": "#FFFFFF",
+      "marketing_dark": "#1A2421",
+      "marketing_light": "#F3F7F4"
+    },
+    "text": {
+      "primary": "#1A2421",
+      "secondary": "#4A5D56",
+      "inverse": "#FAF9F6",
+      "muted": "#8EA19A"
+    },
+    "semantic": {
+      "safe": "#259E7E",
+      "safe_bg": "#E9F5F2",
+      "near_expiry": "#F4C430",
+      "near_expiry_bg": "#FEF9E6",
+      "critical": "#E07A5F",
+      "critical_bg": "#FCF2EF",
+      "expired": "#D62828",
+      "expired_bg": "#FBEAEA"
+    },
+    "border": {
+      "default": "#E2E8E5",
+      "focus": "#259E7E"
+    }
+  },
+  "typography": {
+    "google_fonts_url": "https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;600;700;900&family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@400;500;600&display=swap",
+    "font_families": {
+      "display": "'Fraunces', serif",
+      "body": "'Outfit', sans-serif",
+      "mono": "'JetBrains Mono', monospace"
+    },
+    "rules": {
+      "h1": "font-display text-5xl sm:text-6xl+ tracking-tighter leading-tight font-black",
+      "h2": "font-display text-3xl sm:text-4xl tracking-tight leading-snug font-bold",
+      "h3": "font-body text-xl sm:text-2xl font-semibold",
+      "h4": "font-body text-lg font-medium",
+      "body": "font-body text-base text-secondary",
+      "data": "font-mono text-sm tracking-tight",
+      "overline": "font-mono text-xs uppercase tracking-[0.2em] text-muted font-bold"
+    }
+  },
+  "spacing_and_layout": {
+    "dashboard_grid": "grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6",
+    "marketing_grid": "grid grid-cols-1 md:grid-cols-12 gap-8",
+    "container_padding": "px-6 sm:px-12 md:px-24 py-12 md:py-24",
+    "card_padding": "p-6 sm:p-8",
+    "border_radius": {
+      "cards": "rounded-2xl",
+      "buttons": "rounded-full",
+      "pills": "rounded-full",
+      "inputs": "rounded-xl"
+    }
+  },
+  "motion": {
+    "marketing": "Scroll-reveal stagger using Framer Motion. Elements should slide up slightly and fade in. Use spring physics for image appearances.",
+    "dashboard": "Subtle micro-interactions. Hover lifts (-translate-y-1) for cards. Status pills should have a gentle pulse animation for 'Critical' and 'Expired' states.",
+    "camera_scan": "Laser line scanning animation over the viewfinder. Flash effect on capture. Smooth height transition when OCR result card appears."
+  },
+  "components": {
+    "buttons": {
+      "primary": "bg-brand-primary text-white font-body font-semibold rounded-full px-6 py-3 hover:bg-brand-primary_hover transition-colors shadow-[0_4px_14px_0_rgba(37,158,126,0.39)]",
+      "accent": "bg-brand-accent text-text-primary font-body font-bold rounded-full px-6 py-3 hover:bg-brand-accent_hover transition-colors shadow-sm",
+      "outline": "border-2 border-border-default text-text-primary rounded-full px-6 py-3 hover:border-brand-primary transition-colors"
+    },
+    "status_pills": {
+      "base": "inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-mono font-bold",
+      "safe": "bg-semantic-safe_bg text-semantic-safe",
+      "near_expiry": "bg-semantic-near_expiry_bg text-[#B89424]",
+      "critical": "bg-semantic-critical_bg text-semantic-critical",
+      "expired": "bg-semantic-expired_bg text-semantic-expired"
+    },
+    "cards": {
+      "kpi_tile": "bg-background-dashboard_surface border border-border-default rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden",
+      "kpi_accent_ring": "absolute -right-4 -top-4 w-24 h-24 rounded-full border-4 border-brand-accent opacity-20",
+      "data_table": "w-full text-left font-body text-sm border-collapse",
+      "ocr_result": "bg-background-dashboard_surface border-2 border-brand-primary rounded-2xl p-6 shadow-lg"
+    },
+    "camera_scan": {
+      "viewfinder": "relative w-full aspect-[3/4] sm:aspect-video bg-black rounded-2xl overflow-hidden",
+      "brackets": "absolute inset-4 border-2 border-white/50 rounded-xl pointer-events-none before:absolute before:inset-0 before:border-4 before:border-brand-accent before:[clip-path:polygon(0_0,20px_0,20px_4px,4px_4px,4px_20px,0_20px)]",
+      "confidence_bar": "h-2 rounded-full overflow-hidden bg-gray-200 mt-2",
+      "confidence_fill": "h-full bg-brand-primary transition-all duration-500"
+    }
+  },
+  "pages": {
+    "landing": {
+      "vibe": "Bold, flavor-forward, high energy. Dark theme (#1A2421) hero with massive Fraunces typography, vibrant 3D/vector illustrations of groceries, and #C1D544 buttons.",
+      "sections": ["Hero with 'Start Scanning' CTA", "Scroll-driven features (Color shifts on scroll)", "Footer with massive logo"]
+    },
+    "auth": {
+      "vibe": "Split screen. Left: vibrant marketing imagery. Right: clean, off-white form with clear role selection (Worker/Manager/Admin).",
+      "features": ["Role selection toggle", "Email/Password inputs", "Primary login CTA"]
+    },
+    "dashboard_layout": {
+      "vibe": "Calm, functional, data-dense. Off-white (#FAF9F6) background. Sidebar navigation in dark green.",
+      "header": "Sticky top bar, breadcrumbs, user profile, notification bell."
+    },
+    "inventory_dashboard": {
+      "features": ["4 KPI Tiles (Total, Safe, Near Expiry, Critical, Expired)", "Filter bar (Category, Status)", "Data table with JetBrains Mono for dates and batch numbers", "Status pills per row"]
+    },
+    "scan_flow": {
+      "vibe": "Mobile-first, full-screen camera view.",
+      "workflow": ["Live camera preview", "Capture button", "OCR processing overlay", "Validation Form (Editable fields with confidence scores)"]
+    },
+    "alerts_reports": {
+      "features": ["Real-time toast notifications for near-expiry", "Charts showing food waste reduction", "List of recent OCR failures requiring manual review"]
+    }
+  },
+  "images": {
+    "warehouse_worker": {
+      "url": "https://images.pexels.com/photos/4484042/pexels-photo-4484042.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "description": "Man managing inventory with tablet in warehouse, focusing on efficiency in storage operations.",
+      "category": "auth_background"
+    },
+    "supermarket_produce": {
+      "url": "https://images.pexels.com/photos/2733918/pexels-photo-2733918.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "description": "Colorful assortment of fresh vegetables arranged on supermarket shelves",
+      "category": "landing_hero"
+    },
+    "colorful_packaging": {
+      "url": "https://images.unsplash.com/photo-1633533447057-56ccf997f4fe?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzR8MHwxfHNlYXJjaHwxfHxjb2xvcmZ1bCUyMGJldmVyYWdlJTIwcGFja2FnaW5nfGVufDB8fHx8MTc4MTg2MDU4M3ww&ixlib=rb-4.1.0&q=85",
+      "description": "colorful bags of coffee/beverages",
+      "category": "landing_feature"
+    }
+  },
+  "testing_attributes": {
+    "rule": "All interactive elements must include a data-testid attribute.",
+    "examples": [
+      "data-testid='login-submit-button'",
+      "data-testid='scan-capture-button'",
+      "data-testid='inventory-filter-category'",
+      "data-testid='kpi-total-products'"
+    ]
+  }
+}
