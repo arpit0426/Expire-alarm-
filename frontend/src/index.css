@@ -1,0 +1,106 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: "Outfit", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  background-color: #faf9f6;
+  color: #1a2421;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: #c1d544;
+  color: #1a2421;
+}
+
+/* Custom scrollbar */
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: #c9d3ce;
+  border-radius: 999px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: #8ea19a;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Headline display tightening */
+.font-display {
+  letter-spacing: -0.02em;
+}
+
+/* Grain overlay for marketing surfaces */
+.grain::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.05 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  opacity: 0.5;
+  mix-blend-mode: overlay;
+}
+
+/* Camera viewfinder brackets */
+.viewfinder::before,
+.viewfinder::after,
+.viewfinder > .vf-tl,
+.viewfinder > .vf-tr,
+.viewfinder > .vf-bl,
+.viewfinder > .vf-br {
+  content: "";
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  border-color: #c1d544;
+  border-style: solid;
+  border-width: 0;
+}
+.viewfinder::before {
+  top: 16px;
+  left: 16px;
+  border-top-width: 3px;
+  border-left-width: 3px;
+  border-top-left-radius: 12px;
+}
+.viewfinder::after {
+  top: 16px;
+  right: 16px;
+  border-top-width: 3px;
+  border-right-width: 3px;
+  border-top-right-radius: 12px;
+}
+.viewfinder .vf-bl {
+  bottom: 16px;
+  left: 16px;
+  border-bottom-width: 3px;
+  border-left-width: 3px;
+  border-bottom-left-radius: 12px;
+}
+.viewfinder .vf-br {
+  bottom: 16px;
+  right: 16px;
+  border-bottom-width: 3px;
+  border-right-width: 3px;
+  border-bottom-right-radius: 12px;
+}
+
+/* Focus ring */
+:focus-visible {
+  outline: 2px solid #259e7e;
+  outline-offset: 2px;
+}
