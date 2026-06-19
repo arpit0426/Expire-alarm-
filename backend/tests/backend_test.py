@@ -8,17 +8,22 @@ from datetime import date, timedelta
 import pytest
 import requests
 
-BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://c0793a4a-13eb-4092-9505-41f826a6037d.preview.emergentagent.com").rstrip("/")
+BASE_URL = os.environ.get(
+    "REACT_APP_BACKEND_URL",
+    "https://c0793a4a-13eb-4092-9505-41f826a6037d.preview.emergentagent.com",
+).rstrip("/")
 API = f"{BASE_URL}/api"
 
-ADMIN_EMAIL = "admin@inventory.com"
-ADMIN_PASSWORD = "Admin@12345"
+# Credentials are read from env so they aren't pinned in source.
+# Defaults match the dev-mode seed values in /app/backend/.env.
+ADMIN_EMAIL = os.environ.get("TEST_ADMIN_EMAIL", "admin@inventory.com")
+ADMIN_PASSWORD = os.environ.get("TEST_ADMIN_PASSWORD", "Admin@12345")
 
 # Unique suffix so reruns don't collide on unique email/product indices
 RUN = str(int(time.time()))
 WORKER_EMAIL = f"TEST_worker_{RUN}@inventory.com"
 MANAGER_EMAIL = f"TEST_manager_{RUN}@inventory.com"
-PASSWORD = "Pa$$word123"
+PASSWORD = os.environ.get("TEST_USER_PASSWORD", "Pa$$word123")
 
 
 @pytest.fixture(scope="session")
@@ -409,6 +414,109 @@ def test_ocr_scan_with_base64(worker_token):
 def test_ocr_scan_missing_input(worker_token):
     r = requests.post(f"{API}/ocr/scan", headers=H(worker_token), timeout=15)
     assert r.status_code == 400
+
+
+# ---------------- New: HttpOnly cookie auth, logout, role_overridden ----------------
+def _has_access_cookie_set(resp) -> bool:
+    """Check Set-Cookie header(s) for access_token with HttpOnly + SameSite=Lax."""
+    set_cookies = resp.headers.get("set-cookie", "")
+    # requests collapses multiple Set-Cookie into a single comma-joined string; check substrings.
+    return (
+        "access_token=" in set_cookies
+        and "HttpOnly" in set_cookies
+        and "SameSite=lax" in set_cookies.lower().replace("samesite=lax", "SameSite=lax")
+    )
+
+
+def test_login_sets_httponly_cookie():
+    r = requests.post(f"{API}/auth/login",
+                      json={"email": ADMIN_EMAIL, "password": ADMIN_PASSWORD},
+                      timeout=15)
+    assert r.status_code == 200
+    sc = r.headers.get("set-cookie", "")
+    assert "access_token=" in sc, f"Missing access_token cookie. Set-Cookie: {sc}"
+    assert "HttpOnly" in sc, f"Cookie not HttpOnly. Set-Cookie: {sc}"
+    # SameSite=Lax (case-insensitive)
+    assert "samesite=lax" in sc.lower(), f"Cookie SameSite not Lax. Set-Cookie: {sc}"
+    # The Secure attribute is expected (server sets secure=True)
+    assert "Secure" in sc, f"Cookie not Secure. Set-Cookie: {sc}"
+    # Cookie is also present in the session jar
+    assert "access_token" in r.cookies
+
+
+def test_register_sets_httponly_cookie_and_role_overridden_true():
+    email = f"TEST_cookie_admin_{RUN}@x.com"
+    r = requests.post(f"{API}/auth/register", json={
+        "email": email, "password": PASSWORD, "name": "CookieAdm", "role": "admin"
+    }, timeout=15)
+    assert r.status_code == 200
+    body = r.json()
+    # role coerced + role_overridden flagged
+    assert body["user"]["role"] == "worker"
+    assert body.get("role_overridden") is True, f"role_overridden missing/false: {body}"
+    sc = r.headers.get("set-cookie", "")
+    assert "access_token=" in sc and "HttpOnly" in sc and "samesite=lax" in sc.lower()
+
+
+def test_register_role_overridden_false_for_manager():
+    email = f"TEST_cookie_mgr_{RUN}@x.com"
+    r = requests.post(f"{API}/auth/register", json={
+        "email": email, "password": PASSWORD, "name": "CookieMgr", "role": "manager"
+    }, timeout=15)
+    assert r.status_code == 200
+    body = r.json()
+    assert body["user"]["role"] == "manager"
+    assert body.get("role_overridden") is False, f"role_overridden should be False: {body}"
+
+
+def test_me_with_only_cookie_no_authorization_header():
+    """Session-based flow: login via cookie, call /auth/me without Bearer header."""
+    s = requests.Session()
+    r = s.post(f"{API}/auth/login",
+               json={"email": ADMIN_EMAIL, "password": ADMIN_PASSWORD},
+               timeout=15)
+    assert r.status_code == 200
+    assert "access_token" in s.cookies
+    # No Authorization header -> rely solely on cookie
+    r2 = s.get(f"{API}/auth/me", timeout=10)
+    assert r2.status_code == 200, f"Cookie-only /auth/me failed: {r2.status_code} {r2.text}"
+    data = r2.json()
+    assert data["email"] == ADMIN_EMAIL
+    assert data["role"] == "admin"
+
+
+def test_logout_clears_cookie_and_blocks_me():
+    s = requests.Session()
+    r = s.post(f"{API}/auth/login",
+               json={"email": ADMIN_EMAIL, "password": ADMIN_PASSWORD},
+               timeout=15)
+    assert r.status_code == 200
+    # Confirm authenticated via cookie
+    r_me = s.get(f"{API}/auth/me", timeout=10)
+    assert r_me.status_code == 200
+    # Logout
+    r_out = s.post(f"{API}/auth/logout", timeout=10)
+    assert r_out.status_code == 200
+    sc = r_out.headers.get("set-cookie", "")
+    # delete_cookie sets Max-Age=0 or expires in the past
+    assert "access_token=" in sc, f"Logout did not Set-Cookie access_token: {sc}"
+    assert ("max-age=0" in sc.lower()
+            or "expires=thu, 01 jan 1970" in sc.lower()), \
+        f"Logout cookie not cleared: {sc}"
+    # Session jar should no longer have it usable
+    # After logout, /auth/me must 401
+    r_after = s.get(f"{API}/auth/me", timeout=10)
+    assert r_after.status_code == 401, f"/auth/me after logout: {r_after.status_code} {r_after.text}"
+
+
+def test_bearer_token_auth_still_works(admin_token):
+    """Regression: legacy Authorization: Bearer flow still works without cookie."""
+    # Use a fresh requests call (no Session/cookies) and Bearer header only
+    r = requests.get(f"{API}/auth/me",
+                     headers={"Authorization": f"Bearer {admin_token}"},
+                     timeout=10)
+    assert r.status_code == 200
+    assert r.json()["email"] == ADMIN_EMAIL
 
 
 # ---------------- Cleanup ----------------

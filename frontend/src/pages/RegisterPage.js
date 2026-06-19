@@ -23,8 +23,12 @@ export default function RegisterPage() {
     e.preventDefault();
     setLoading(true);
     try {
-      await register(form);
-      toast.success("Welcome to FreshTrack");
+      const data = await register(form);
+      if (data?.role_overridden) {
+        toast.warning("Admin role can only be granted by an existing admin — you have been registered as a worker.");
+      } else {
+        toast.success("Welcome to FreshTrack");
+      }
       navigate("/app", { replace: true });
     } catch (err) {
       toast.error(formatApiErrorDetail(err?.response?.data?.detail) || "Sign-up failed");

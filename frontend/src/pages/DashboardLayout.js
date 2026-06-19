@@ -57,8 +57,11 @@ export default function DashboardLayout() {
       try {
         const { data } = await api.get("/alerts", { params: { unread_only: true, limit: 50 } });
         if (on) setUnread(data.length);
-      } catch (_e) {
-        // silent
+      } catch (err) {
+        // Polling — never throw, just log in dev.
+        if (process.env.NODE_ENV !== "production") {
+          console.warn("Unread-alerts poll failed:", err?.message);
+        }
       }
     };
     load();
@@ -69,8 +72,8 @@ export default function DashboardLayout() {
     };
   }, []);
 
-  const onLogout = () => {
-    logout();
+  const onLogout = async () => {
+    await logout();
     navigate("/login", { replace: true });
   };
 

@@ -10,18 +10,23 @@ import bcrypt
 import jwt as pyjwt
 import logging
 from datetime import datetime, timezone, timedelta, date
-from typing import Optional, List, Annotated, Any
+from typing import Optional, List, Annotated, Any, Dict, Tuple
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, APIRouter, Depends, HTTPException, status, Request, UploadFile, File, Form
+from fastapi import (
+    FastAPI, APIRouter, Depends, HTTPException, Request, Response,
+    UploadFile, File, Form,
+)
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse, JSONResponse
-from pydantic import BaseModel, EmailStr, Field, BeforeValidator, ConfigDict
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel, EmailStr, Field, BeforeValidator
 from motor.motor_asyncio import AsyncIOMotorClient
 from bson import ObjectId
 from openpyxl import Workbook
 
-from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent, TextDelta, StreamDone
+from emergentintegrations.llm.chat import (
+    LlmChat, UserMessage, ImageContent, TextDelta, StreamDone,
+)
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -38,6 +43,7 @@ EMERGENT_LLM_KEY = os.environ.get("EMERGENT_LLM_KEY", "")
 JWT_SECRET = os.environ["JWT_SECRET"]
 JWT_ALGORITHM = "HS256"
 ACCESS_TOKEN_TTL_MIN = 60 * 24  # 1 day
+ACCESS_COOKIE_MAX_AGE = ACCESS_TOKEN_TTL_MIN * 60
 ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "admin@inventory.com")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "Admin@12345")
 FRONTEND_URL = os.environ.get("FRONTEND_URL", "*")
@@ -46,6 +52,7 @@ NEAR_EXPIRY_DAYS_DEFAULT = int(os.environ.get("NEAR_EXPIRY_DAYS_DEFAULT", "30"))
 CRITICAL_EXPIRY_DAYS_DEFAULT = int(os.environ.get("CRITICAL_EXPIRY_DAYS_DEFAULT", "7"))
 
 ROLES = ["worker", "manager", "admin"]
+ACCESS_COOKIE = "access_token"
 
 # ---------------------------------------------------------------------------
 # DB
@@ -108,9 +115,29 @@ def create_access_token(user_id: str, email: str, role: str) -> str:
     return pyjwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
 
+def set_access_cookie(response: Response, token: str) -> None:
+    response.set_cookie(
+        key=ACCESS_COOKIE,
+        value=token,
+        httponly=True,
+        secure=True,
+        samesite="lax",
+        max_age=ACCESS_COOKIE_MAX_AGE,
+        path="/",
+    )
+
+
+def clear_access_cookie(response: Response) -> None:
+    response.delete_cookie(key=ACCESS_COOKIE, path="/")
+
+
 async def get_current_user(request: Request) -> dict:
-    auth = request.headers.get("Authorization", "")
-    token = auth[7:] if auth.startswith("Bearer ") else request.cookies.get("access_token")
+    # Prefer httpOnly cookie; fall back to Authorization header for API/test clients.
+    token = request.cookies.get(ACCESS_COOKIE)
+    if not token:
+        auth = request.headers.get("Authorization", "")
+        if auth.startswith("Bearer "):
+            token = auth[7:]
     if not token:
         raise HTTPException(status_code=401, detail="Not authenticated")
     try:
@@ -163,6 +190,7 @@ class TokenOut(BaseModel):
     access_token: str
     token_type: str = "bearer"
     user: UserOut
+    role_overridden: bool = False
 
 
 class OcrFields(BaseModel):
@@ -208,6 +236,10 @@ class ThresholdIn(BaseModel):
     critical_days: int = Field(ge=1, le=365)
 
 
+class UpdateUserRoleIn(BaseModel):
+    role: str
+
+
 # ---------------------------------------------------------------------------
 # Helpers: date parsing / status
 # ---------------------------------------------------------------------------
@@ -222,15 +254,13 @@ DATE_FORMATS = [
 def parse_date(s: Optional[str]) -> Optional[date]:
     if not s:
         return None
-    s = str(s).strip()
-    s = re.sub(r"\s+", " ", s)
+    s = re.sub(r"\s+", " ", str(s).strip())
     for fmt in DATE_FORMATS:
         try:
             d = datetime.strptime(s, fmt)
             if fmt in ("%b %Y", "%B %Y", "%m-%Y", "%m/%Y", "%Y-%m"):
-                # default to end-of-month for month-only dates
                 next_month = d.replace(day=28) + timedelta(days=4)
-                return (next_month - timedelta(days=next_month.day))
+                return next_month - timedelta(days=next_month.day)
             if fmt == "%Y":
                 return d.replace(month=12, day=31).date()
             return d.date()
@@ -239,20 +269,27 @@ def parse_date(s: Optional[str]) -> Optional[date]:
     return None
 
 
-async def get_thresholds(category: str) -> tuple[int, int]:
+async def load_threshold_map() -> Dict[str, Tuple[int, int]]:
+    """Fetch all thresholds once per request to avoid N+1 lookups."""
+    out: Dict[str, Tuple[int, int]] = {}
+    async for t in db.thresholds.find():
+        out[t["category"]] = (
+            int(t.get("near_expiry_days", NEAR_EXPIRY_DAYS_DEFAULT)),
+            int(t.get("critical_days", CRITICAL_EXPIRY_DAYS_DEFAULT)),
+        )
+    return out
+
+
+def thresholds_for(category: Optional[str], cache: Dict[str, Tuple[int, int]]) -> Tuple[int, int]:
     cat = (category or "general").lower()
-    cfg = await db.thresholds.find_one({"category": cat})
-    if cfg:
-        return int(cfg.get("near_expiry_days", NEAR_EXPIRY_DAYS_DEFAULT)), int(cfg.get("critical_days", CRITICAL_EXPIRY_DAYS_DEFAULT))
-    return NEAR_EXPIRY_DAYS_DEFAULT, CRITICAL_EXPIRY_DAYS_DEFAULT
+    return cache.get(cat, (NEAR_EXPIRY_DAYS_DEFAULT, CRITICAL_EXPIRY_DAYS_DEFAULT))
 
 
-def compute_status(exp_date_str: Optional[str], near_days: int, critical_days: int) -> tuple[str, int]:
+def compute_status(exp_date_str: Optional[str], near_days: int, critical_days: int) -> Tuple[str, int]:
     d = parse_date(exp_date_str)
     if not d:
         return ("unknown", 9999)
-    today = date.today()
-    diff = (d - today).days
+    diff = (d - date.today()).days
     if diff < 0:
         return ("expired", diff)
     if diff <= critical_days:
@@ -262,16 +299,22 @@ def compute_status(exp_date_str: Optional[str], near_days: int, critical_days: i
     return ("safe", diff)
 
 
-async def enrich_product(p: dict) -> dict:
-    near, crit = await get_thresholds(p.get("category", "general"))
+def enrich_product_sync(p: dict, cache: Dict[str, Tuple[int, int]]) -> dict:
+    near, crit = thresholds_for(p.get("category"), cache)
     status_str, days_left = compute_status(p.get("exp_date"), near, crit)
     p["status"] = status_str
     p["days_left"] = days_left
     return p
 
 
+async def enrich_product(p: dict) -> dict:
+    """Single-product variant; for multi-product use load_threshold_map() + enrich_product_sync."""
+    cache = await load_threshold_map()
+    return enrich_product_sync(p, cache)
+
+
 # ---------------------------------------------------------------------------
-# OCR (Gemini Vision)
+# OCR (Gemini Vision) — split into small helpers for testability
 # ---------------------------------------------------------------------------
 OCR_SYSTEM_PROMPT = """You are an OCR + structured extraction engine for product labels.
 Extract the following fields from the image of a product label:
@@ -293,11 +336,7 @@ Do not wrap the JSON in markdown fences. No explanations."""
 
 
 def _extract_json_blob(text: str) -> Optional[dict]:
-    text = text.strip()
-    # Strip markdown fences if any
-    text = re.sub(r"^```(?:json)?\s*", "", text)
-    text = re.sub(r"\s*```$", "", text)
-    # Find first {...} blob
+    text = re.sub(r"\s*```$", "", re.sub(r"^```(?:json)?\s*", "", text.strip()))
     m = re.search(r"\{.*\}", text, re.DOTALL)
     if not m:
         return None
@@ -307,41 +346,27 @@ def _extract_json_blob(text: str) -> Optional[dict]:
         return None
 
 
-async def run_ocr_on_image(image_b64: str) -> dict:
-    if not EMERGENT_LLM_KEY:
-        raise HTTPException(status_code=500, detail="LLM key not configured")
-    session_id = f"ocr-{datetime.now(timezone.utc).timestamp()}"
-    chat = LlmChat(
-        api_key=EMERGENT_LLM_KEY,
-        session_id=session_id,
-        system_message=OCR_SYSTEM_PROMPT,
-    ).with_model("gemini", "gemini-3-flash-preview")
+def _parse_confidence(raw: Any) -> float:
+    try:
+        return max(0.0, min(1.0, float(raw)))
+    except (TypeError, ValueError):
+        return 0.0
 
-    image = ImageContent(image_base64=image_b64)
-    msg = UserMessage(text="Extract the product label fields. Respond ONLY with JSON.", file_contents=[image])
 
-    response_text = ""
-    async for ev in chat.stream_message(msg):
-        if isinstance(ev, TextDelta):
-            response_text += ev.content
-        elif isinstance(ev, StreamDone):
-            break
-
-    parsed = _extract_json_blob(response_text) or {}
-    fields = OcrFields(
+def _build_ocr_fields(parsed: dict) -> OcrFields:
+    quantity = parsed.get("quantity")
+    category = parsed.get("category")
+    return OcrFields(
         product_name=parsed.get("product_name"),
         batch_number=parsed.get("batch_number"),
         mfg_date=parsed.get("mfg_date"),
         exp_date=parsed.get("exp_date"),
-        quantity=str(parsed.get("quantity")) if parsed.get("quantity") is not None else None,
-        category=(parsed.get("category") or "general").lower() if parsed.get("category") else "general",
+        quantity=str(quantity) if quantity is not None else None,
+        category=(category or "general").lower() if category else "general",
     )
-    raw_conf = parsed.get("confidence", 0.0)
-    try:
-        confidence = max(0.0, min(1.0, float(raw_conf)))
-    except Exception:
-        confidence = 0.0
 
+
+def _validate_ocr_fields(fields: OcrFields) -> List[str]:
     issues: List[str] = []
     for fname in ("product_name", "batch_number", "exp_date"):
         if not getattr(fields, fname):
@@ -352,9 +377,39 @@ async def run_ocr_on_image(image_b64: str) -> dict:
         issues.append("exp_before_mfg")
     if fields.exp_date and not exp_d:
         issues.append("unparseable_exp_date")
+    return issues
 
+
+async def _call_gemini_vision(image_b64: str) -> str:
+    session_id = f"ocr-{datetime.now(timezone.utc).timestamp()}"
+    chat = LlmChat(
+        api_key=EMERGENT_LLM_KEY,
+        session_id=session_id,
+        system_message=OCR_SYSTEM_PROMPT,
+    ).with_model("gemini", "gemini-3-flash-preview")
+    image = ImageContent(image_base64=image_b64)
+    msg = UserMessage(
+        text="Extract the product label fields. Respond ONLY with JSON.",
+        file_contents=[image],
+    )
+    response_text = ""
+    async for ev in chat.stream_message(msg):
+        if isinstance(ev, TextDelta):
+            response_text += ev.content
+        elif isinstance(ev, StreamDone):
+            break
+    return response_text
+
+
+async def run_ocr_on_image(image_b64: str) -> dict:
+    if not EMERGENT_LLM_KEY:
+        raise HTTPException(status_code=500, detail="LLM key not configured")
+    raw_response = await _call_gemini_vision(image_b64)
+    parsed = _extract_json_blob(raw_response) or {}
+    fields = _build_ocr_fields(parsed)
+    confidence = _parse_confidence(parsed.get("confidence", 0.0))
+    issues = _validate_ocr_fields(fields)
     needs_review = confidence < 0.75 or bool(issues)
-
     return {
         "fields": fields.model_dump(),
         "confidence": confidence,
@@ -367,7 +422,13 @@ async def run_ocr_on_image(image_b64: str) -> dict:
 # ---------------------------------------------------------------------------
 # Alerts
 # ---------------------------------------------------------------------------
-async def create_alert(kind: str, message: str, severity: str = "info", product_id: Optional[str] = None, meta: Optional[dict] = None):
+async def create_alert(
+    kind: str,
+    message: str,
+    severity: str = "info",
+    product_id: Optional[str] = None,
+    meta: Optional[dict] = None,
+):
     await db.alerts.insert_one({
         "kind": kind,
         "message": message,
@@ -379,18 +440,73 @@ async def create_alert(kind: str, message: str, severity: str = "info", product_
     })
 
 
+async def _emit_product_status_alert(saved: dict) -> None:
+    status_ = saved["status"]
+    if status_ not in ("near_expiry", "critical", "expired"):
+        return
+    if status_ == "expired":
+        message = f"{saved['product_name']} (batch {saved['batch_number']}) is EXPIRED"
+        severity = "critical"
+    else:
+        message = (
+            f"{saved['product_name']} (batch {saved['batch_number']}) is "
+            f"{status_.replace('_', ' ')}"
+        )
+        severity = "warning" if status_ == "near_expiry" else "critical"
+    await create_alert(status_, message, severity=severity, product_id=saved["id"])
+
+
+# ---------------------------------------------------------------------------
+# Product validation helpers
+# ---------------------------------------------------------------------------
+def _validate_product_dates(body: ProductIn) -> None:
+    exp_d = parse_date(body.exp_date)
+    if not exp_d:
+        raise HTTPException(status_code=400, detail="Invalid exp_date")
+    if body.mfg_date:
+        mfg_d = parse_date(body.mfg_date)
+        if mfg_d and mfg_d >= exp_d:
+            raise HTTPException(status_code=400, detail="exp_date must be after mfg_date")
+
+
+async def _check_duplicate_product(name: str, batch: str) -> None:
+    existing = await db.products.find_one({"product_name": name, "batch_number": batch})
+    if existing:
+        await create_alert(
+            "duplicate",
+            f"Duplicate batch attempted: {name} / {batch}",
+            severity="warning",
+            product_id=str(existing["_id"]),
+        )
+        raise HTTPException(status_code=409, detail="Duplicate product+batch already exists")
+
+
+def _build_product_doc(body: ProductIn, user_id: str) -> dict:
+    now = datetime.now(timezone.utc)
+    return {
+        "product_name": body.product_name.strip(),
+        "batch_number": body.batch_number.strip(),
+        "mfg_date": body.mfg_date,
+        "exp_date": body.exp_date,
+        "quantity": body.quantity or 0,
+        "category": (body.category or "general").lower(),
+        "notes": body.notes,
+        "created_by": user_id,
+        "created_at": now,
+        "updated_at": now,
+    }
+
+
 # ---------------------------------------------------------------------------
 # App lifecycle
 # ---------------------------------------------------------------------------
 @asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Indexes
+async def lifespan(_app: FastAPI):
     await db.users.create_index("email", unique=True)
     await db.products.create_index([("product_name", 1), ("batch_number", 1)], unique=True)
     await db.alerts.create_index([("created_at", -1)])
     await db.thresholds.create_index("category", unique=True)
 
-    # Seed admin
     existing = await db.users.find_one({"email": ADMIN_EMAIL.lower()})
     if not existing:
         await db.users.insert_one({
@@ -402,7 +518,6 @@ async def lifespan(app: FastAPI):
         })
         logger.info("Admin user seeded: %s", ADMIN_EMAIL)
 
-    # Seed default category thresholds
     defaults = [
         {"category": "general", "near_expiry_days": 30, "critical_days": 7},
         {"category": "dairy", "near_expiry_days": 7, "critical_days": 2},
@@ -425,9 +540,13 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Expiry Detection & Inventory Management", lifespan=lifespan)
 api = APIRouter(prefix="/api")
 
+# CORS — when allow_credentials=True is in play, "*" is rejected by browsers.
+# Use the configured FRONTEND_URL; "*" is preserved for non-credentialed clients.
+_cors_origins = ["*"] if FRONTEND_URL == "*" else [FRONTEND_URL]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"] if FRONTEND_URL == "*" else [FRONTEND_URL],
+    allow_origins=_cors_origins,
+    allow_origin_regex=r"https://.*\.preview\.emergentagent\.com" if FRONTEND_URL == "*" else None,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -446,14 +565,13 @@ async def health():
 # Auth
 # ---------------------------------------------------------------------------
 @api.post("/auth/register", response_model=TokenOut)
-async def register(body: RegisterIn):
+async def register(body: RegisterIn, response: Response):
     email = body.email.lower()
-    role = body.role.lower() if body.role else "worker"
-    if role not in ROLES:
+    requested_role = body.role.lower() if body.role else "worker"
+    if requested_role not in ROLES:
         raise HTTPException(status_code=400, detail="Invalid role")
-    if role == "admin":
-        # Admin role cannot be self-assigned via register
-        role = "worker"
+    role = "worker" if requested_role == "admin" else requested_role
+    role_overridden = role != requested_role
     existing = await db.users.find_one({"email": email})
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
@@ -467,30 +585,39 @@ async def register(body: RegisterIn):
     res = await db.users.insert_one(doc)
     uid = str(res.inserted_id)
     token = create_access_token(uid, email, role)
+    set_access_cookie(response, token)
     return TokenOut(
         access_token=token,
-        user=UserOut(id=uid, email=email, name=body.name, role=role, created_at=doc["created_at"].isoformat()),
+        role_overridden=role_overridden,
+        user=UserOut(
+            id=uid, email=email, name=body.name, role=role,
+            created_at=doc["created_at"].isoformat(),
+        ),
     )
 
 
 @api.post("/auth/login", response_model=TokenOut)
-async def login(body: LoginIn):
+async def login(body: LoginIn, response: Response):
     email = body.email.lower()
     user = await db.users.find_one({"email": email})
     if not user or not verify_password(body.password, user["password_hash"]):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     uid = str(user["_id"])
     token = create_access_token(uid, email, user["role"])
+    set_access_cookie(response, token)
     return TokenOut(
         access_token=token,
         user=UserOut(
-            id=uid,
-            email=email,
-            name=user["name"],
-            role=user["role"],
+            id=uid, email=email, name=user["name"], role=user["role"],
             created_at=user["created_at"].isoformat() if user.get("created_at") else None,
         ),
     )
+
+
+@api.post("/auth/logout")
+async def logout(response: Response):
+    clear_access_cookie(response)
+    return {"ok": True}
 
 
 @api.get("/auth/me", response_model=UserOut)
@@ -505,7 +632,7 @@ async def me(user: dict = Depends(get_current_user)):
 
 
 @api.get("/users")
-async def list_users(user: dict = Depends(require_roles("admin"))):
+async def list_users(_user: dict = Depends(require_roles("admin"))):
     out = []
     async for u in db.users.find().sort("created_at", -1):
         u = serialize_doc(u)
@@ -514,12 +641,12 @@ async def list_users(user: dict = Depends(require_roles("admin"))):
     return out
 
 
-class UpdateUserRoleIn(BaseModel):
-    role: str
-
-
 @api.put("/users/{user_id}/role")
-async def update_user_role(user_id: str, body: UpdateUserRoleIn, current: dict = Depends(require_roles("admin"))):
+async def update_user_role(
+    user_id: str,
+    body: UpdateUserRoleIn,
+    _current: dict = Depends(require_roles("admin")),
+):
     if body.role not in ROLES:
         raise HTTPException(status_code=400, detail="Invalid role")
     res = await db.users.update_one({"_id": ObjectId(user_id)}, {"$set": {"role": body.role}})
@@ -535,17 +662,17 @@ async def update_user_role(user_id: str, body: UpdateUserRoleIn, current: dict =
 async def ocr_scan(
     file: Optional[UploadFile] = File(None),
     image_base64: Optional[str] = Form(None),
-    user: dict = Depends(get_current_user),
+    _user: dict = Depends(get_current_user),
 ):
     if file is not None:
         raw = await file.read()
         b64 = base64.b64encode(raw).decode("utf-8")
     elif image_base64:
-        # Strip data URI prefix if present
         b64 = image_base64.split(",", 1)[-1] if "," in image_base64 else image_base64
     else:
         raise HTTPException(status_code=400, detail="Provide file or image_base64")
 
+    result: Optional[dict] = None
     try:
         result = await run_ocr_on_image(b64)
     except HTTPException:
@@ -569,59 +696,17 @@ async def ocr_scan(
 # Products / Inventory
 # ---------------------------------------------------------------------------
 @api.post("/products")
-async def create_product(body: ProductIn, user: dict = Depends(require_roles("worker", "manager", "admin"))):
-    # validate dates
-    exp_d = parse_date(body.exp_date)
-    if not exp_d:
-        raise HTTPException(status_code=400, detail="Invalid exp_date")
-    if body.mfg_date:
-        mfg_d = parse_date(body.mfg_date)
-        if mfg_d and mfg_d >= exp_d:
-            raise HTTPException(status_code=400, detail="exp_date must be after mfg_date")
-
-    # duplicate check
-    key = {"product_name": body.product_name.strip(), "batch_number": body.batch_number.strip()}
-    existing = await db.products.find_one(key)
-    if existing:
-        await create_alert(
-            "duplicate",
-            f"Duplicate batch attempted: {body.product_name} / {body.batch_number}",
-            severity="warning",
-            product_id=str(existing["_id"]),
-        )
-        raise HTTPException(status_code=409, detail="Duplicate product+batch already exists")
-
-    doc = {
-        "product_name": body.product_name.strip(),
-        "batch_number": body.batch_number.strip(),
-        "mfg_date": body.mfg_date,
-        "exp_date": body.exp_date,
-        "quantity": body.quantity or 0,
-        "category": (body.category or "general").lower(),
-        "notes": body.notes,
-        "created_by": user["id"],
-        "created_at": datetime.now(timezone.utc),
-        "updated_at": datetime.now(timezone.utc),
-    }
+async def create_product(
+    body: ProductIn,
+    user: dict = Depends(require_roles("worker", "manager", "admin")),
+):
+    _validate_product_dates(body)
+    await _check_duplicate_product(body.product_name.strip(), body.batch_number.strip())
+    doc = _build_product_doc(body, user["id"])
     res = await db.products.insert_one(doc)
-    saved = await db.products.find_one({"_id": res.inserted_id})
-    saved = serialize_doc(saved)
+    saved = serialize_doc(await db.products.find_one({"_id": res.inserted_id}))
     saved = await enrich_product(saved)
-
-    if saved["status"] in ("near_expiry", "critical"):
-        await create_alert(
-            f"{saved['status']}",
-            f"{saved['product_name']} (batch {saved['batch_number']}) is {saved['status'].replace('_',' ')}",
-            severity="warning" if saved["status"] == "near_expiry" else "critical",
-            product_id=saved["id"],
-        )
-    elif saved["status"] == "expired":
-        await create_alert(
-            "expired",
-            f"{saved['product_name']} (batch {saved['batch_number']}) is EXPIRED",
-            severity="critical",
-            product_id=saved["id"],
-        )
+    await _emit_product_status_alert(saved)
     return saved
 
 
@@ -631,7 +716,7 @@ async def list_products(
     status_filter: Optional[str] = None,
     category: Optional[str] = None,
     limit: int = 200,
-    user: dict = Depends(get_current_user),
+    _user: dict = Depends(get_current_user),
 ):
     query: dict = {}
     if q:
@@ -642,11 +727,10 @@ async def list_products(
     if category:
         query["category"] = category.lower()
 
-    items = []
+    cache = await load_threshold_map()
+    items: List[dict] = []
     async for p in db.products.find(query).sort("created_at", -1).limit(limit):
-        p = serialize_doc(p)
-        p = await enrich_product(p)
-        items.append(p)
+        items.append(enrich_product_sync(serialize_doc(p), cache))
 
     if status_filter:
         items = [p for p in items if p["status"] == status_filter]
@@ -654,16 +738,19 @@ async def list_products(
 
 
 @api.get("/products/{pid}")
-async def get_product(pid: str, user: dict = Depends(get_current_user)):
+async def get_product(pid: str, _user: dict = Depends(get_current_user)):
     p = await db.products.find_one({"_id": ObjectId(pid)})
     if not p:
         raise HTTPException(status_code=404, detail="Product not found")
-    p = serialize_doc(p)
-    return await enrich_product(p)
+    return await enrich_product(serialize_doc(p))
 
 
 @api.put("/products/{pid}")
-async def update_product(pid: str, body: ProductUpdate, user: dict = Depends(require_roles("manager", "admin"))):
+async def update_product(
+    pid: str,
+    body: ProductUpdate,
+    _user: dict = Depends(require_roles("manager", "admin")),
+):
     update = {k: v for k, v in body.model_dump().items() if v is not None}
     if not update:
         raise HTTPException(status_code=400, detail="No fields to update")
@@ -682,7 +769,7 @@ async def update_product(pid: str, body: ProductUpdate, user: dict = Depends(req
 
 
 @api.delete("/products/{pid}")
-async def delete_product(pid: str, user: dict = Depends(require_roles("manager", "admin"))):
+async def delete_product(pid: str, _user: dict = Depends(require_roles("manager", "admin"))):
     res = await db.products.delete_one({"_id": ObjectId(pid)})
     if res.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Product not found")
@@ -693,18 +780,17 @@ async def delete_product(pid: str, user: dict = Depends(require_roles("manager",
 # Dashboard
 # ---------------------------------------------------------------------------
 @api.get("/dashboard/summary")
-async def dashboard_summary(user: dict = Depends(get_current_user)):
+async def dashboard_summary(_user: dict = Depends(get_current_user)):
     counts = {"total": 0, "safe": 0, "near_expiry": 0, "critical": 0, "expired": 0, "unknown": 0}
     category_counts: dict = {}
+    cache = await load_threshold_map()
     async for p in db.products.find():
-        p = serialize_doc(p)
-        p = await enrich_product(p)
+        p = enrich_product_sync(serialize_doc(p), cache)
         counts["total"] += 1
         counts[p["status"]] = counts.get(p["status"], 0) + 1
         cat = p.get("category", "general")
         category_counts[cat] = category_counts.get(cat, 0) + 1
 
-    # Estimated waste reduction = (near_expiry + critical) products saved before going expired
     estimated_waste_saved = counts.get("near_expiry", 0) + counts.get("critical", 0)
     unread_alerts = await db.alerts.count_documents({"read": False})
     return {
@@ -719,10 +805,12 @@ async def dashboard_summary(user: dict = Depends(get_current_user)):
 # Alerts
 # ---------------------------------------------------------------------------
 @api.get("/alerts")
-async def list_alerts(limit: int = 100, unread_only: bool = False, user: dict = Depends(get_current_user)):
-    q = {}
-    if unread_only:
-        q["read"] = False
+async def list_alerts(
+    limit: int = 100,
+    unread_only: bool = False,
+    _user: dict = Depends(get_current_user),
+):
+    q = {"read": False} if unread_only else {}
     out = []
     async for a in db.alerts.find(q).sort("created_at", -1).limit(limit):
         out.append(serialize_doc(a))
@@ -730,31 +818,26 @@ async def list_alerts(limit: int = 100, unread_only: bool = False, user: dict = 
 
 
 @api.post("/alerts/{aid}/read")
-async def mark_alert_read(aid: str, user: dict = Depends(get_current_user)):
+async def mark_alert_read(aid: str, _user: dict = Depends(get_current_user)):
     await db.alerts.update_one({"_id": ObjectId(aid)}, {"$set": {"read": True}})
     return {"ok": True}
 
 
 @api.post("/alerts/read-all")
-async def read_all_alerts(user: dict = Depends(get_current_user)):
+async def read_all_alerts(_user: dict = Depends(get_current_user)):
     await db.alerts.update_many({"read": False}, {"$set": {"read": True}})
     return {"ok": True}
 
 
 @api.post("/alerts/scan")
-async def scan_alerts(user: dict = Depends(require_roles("manager", "admin"))):
-    """Re-scan all products and emit alerts for any near-expiry / expired ones."""
+async def scan_alerts(_user: dict = Depends(require_roles("manager", "admin"))):
+    """Re-scan all products and emit alerts for any near-expiry / critical / expired ones."""
+    cache = await load_threshold_map()
     created = 0
     async for p in db.products.find():
-        p = serialize_doc(p)
-        p = await enrich_product(p)
+        p = enrich_product_sync(serialize_doc(p), cache)
         if p["status"] in ("near_expiry", "critical", "expired"):
-            await create_alert(
-                p["status"],
-                f"{p['product_name']} (batch {p['batch_number']}) is {p['status'].replace('_',' ')}",
-                severity="warning" if p["status"] == "near_expiry" else "critical",
-                product_id=p["id"],
-            )
+            await _emit_product_status_alert(p)
             created += 1
     return {"alerts_created": created}
 
@@ -763,7 +846,7 @@ async def scan_alerts(user: dict = Depends(require_roles("manager", "admin"))):
 # Thresholds
 # ---------------------------------------------------------------------------
 @api.get("/thresholds")
-async def list_thresholds(user: dict = Depends(get_current_user)):
+async def list_thresholds(_user: dict = Depends(get_current_user)):
     out = []
     async for t in db.thresholds.find().sort("category", 1):
         out.append(serialize_doc(t))
@@ -771,12 +854,23 @@ async def list_thresholds(user: dict = Depends(get_current_user)):
 
 
 @api.put("/thresholds")
-async def upsert_threshold(body: ThresholdIn, user: dict = Depends(require_roles("manager", "admin"))):
+async def upsert_threshold(
+    body: ThresholdIn,
+    _user: dict = Depends(require_roles("manager", "admin")),
+):
     if body.critical_days >= body.near_expiry_days:
-        raise HTTPException(status_code=400, detail="critical_days must be less than near_expiry_days")
+        raise HTTPException(
+            status_code=400,
+            detail="critical_days must be less than near_expiry_days",
+        )
+    cat = body.category.lower()
     await db.thresholds.update_one(
-        {"category": body.category.lower()},
-        {"$set": {"category": body.category.lower(), "near_expiry_days": body.near_expiry_days, "critical_days": body.critical_days}},
+        {"category": cat},
+        {"$set": {
+            "category": cat,
+            "near_expiry_days": body.near_expiry_days,
+            "critical_days": body.critical_days,
+        }},
         upsert=True,
     )
     return {"ok": True}
@@ -788,17 +882,19 @@ async def upsert_threshold(body: ThresholdIn, user: dict = Depends(require_roles
 @api.get("/reports/export")
 async def export_excel(
     status_filter: Optional[str] = None,
-    user: dict = Depends(require_roles("manager", "admin")),
+    _user: dict = Depends(require_roles("manager", "admin")),
 ):
     wb = Workbook()
     ws = wb.active
     ws.title = "Inventory"
-    headers = ["Product Name", "Batch Number", "Category", "MFG Date", "EXP Date", "Quantity", "Status", "Days Left"]
-    ws.append(headers)
+    ws.append([
+        "Product Name", "Batch Number", "Category", "MFG Date",
+        "EXP Date", "Quantity", "Status", "Days Left",
+    ])
 
+    cache = await load_threshold_map()
     async for p in db.products.find().sort("created_at", -1):
-        p = serialize_doc(p)
-        p = await enrich_product(p)
+        p = enrich_product_sync(serialize_doc(p), cache)
         if status_filter and p["status"] != status_filter:
             continue
         ws.append([
@@ -824,15 +920,15 @@ async def export_excel(
 
 
 @api.get("/reports/summary")
-async def reports_summary(user: dict = Depends(get_current_user)):
+async def reports_summary(_user: dict = Depends(get_current_user)):
     """Detailed analytics: counts by status, by category, top near-expiry items."""
     by_status = {"safe": 0, "near_expiry": 0, "critical": 0, "expired": 0, "unknown": 0}
     by_category: dict = {}
-    near_list: list = []
-    expired_list: list = []
+    near_list: List[dict] = []
+    expired_list: List[dict] = []
+    cache = await load_threshold_map()
     async for p in db.products.find():
-        p = serialize_doc(p)
-        p = await enrich_product(p)
+        p = enrich_product_sync(serialize_doc(p), cache)
         by_status[p["status"]] = by_status.get(p["status"], 0) + 1
         cat = p.get("category", "general")
         by_category[cat] = by_category.get(cat, 0) + 1
@@ -843,7 +939,7 @@ async def reports_summary(user: dict = Depends(get_current_user)):
 
     near_list.sort(key=lambda x: x.get("days_left", 999))
     expired_list.sort(key=lambda x: x.get("days_left", 0))
-    estimated_kg_saved = (by_status.get("near_expiry", 0) + by_status.get("critical", 0)) * 0.5  # simple heuristic
+    estimated_kg_saved = (by_status.get("near_expiry", 0) + by_status.get("critical", 0)) * 0.5
     return {
         "by_status": by_status,
         "by_category": by_category,

@@ -208,7 +208,7 @@ export default function LandingPage() {
           <div className="mt-24 border-y border-brand-cream/10 overflow-hidden py-6">
             <div className="flex animate-ticker whitespace-nowrap font-display text-3xl sm:text-5xl font-black uppercase tracking-tight">
               {Array.from({ length: 2 }).map((_, k) => (
-                <span key={k} className="flex items-center gap-10 pr-10 text-brand-cream/30">
+                <span key={`ticker-row-${k}`} className="flex items-center gap-10 pr-10 text-brand-cream/30">
                   <span>Scan</span>
                   <span className="text-brand-accent">·</span>
                   <span>Verify</span>

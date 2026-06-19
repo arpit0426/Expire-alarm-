@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
@@ -24,25 +24,40 @@ const KPI_DEFS = [
   { key: "expired", label: "Expired", icon: TrendingDown, accent: "bg-status-expired" },
 ];
 
+const ALERT_SEVERITY_CLASSES = {
+  critical: "bg-status-criticalBg border-status-critical/30",
+  warning: "bg-status-nearBg border-status-near/30",
+  info: "bg-brand-cream border-line",
+};
+
+function alertSeverityClass(sev) {
+  return ALERT_SEVERITY_CLASSES[sev] || ALERT_SEVERITY_CLASSES.info;
+}
+
 export default function OverviewPage() {
   const { user } = useAuth();
   const [summary, setSummary] = useState(null);
   const [recent, setRecent] = useState([]);
   const [recentAlerts, setRecentAlerts] = useState([]);
 
-  useEffect(() => {
-    const load = async () => {
-      const [{ data: s }, { data: p }, { data: a }] = await Promise.all([
-        api.get("/dashboard/summary"),
-        api.get("/products", { params: { limit: 6 } }),
-        api.get("/alerts", { params: { limit: 5 } }),
-      ]);
-      setSummary(s);
-      setRecent(p);
-      setRecentAlerts(a);
-    };
-    load().catch(() => {});
+  const load = useCallback(async () => {
+    const [{ data: s }, { data: p }, { data: a }] = await Promise.all([
+      api.get("/dashboard/summary"),
+      api.get("/products", { params: { limit: 6 } }),
+      api.get("/alerts", { params: { limit: 5 } }),
+    ]);
+    setSummary(s);
+    setRecent(p);
+    setRecentAlerts(a);
   }, []);
+
+  useEffect(() => {
+    load().catch((err) => {
+      if (process.env.NODE_ENV !== "production") {
+        console.warn("Overview load failed:", err?.message);
+      }
+    });
+  }, [load]);
 
   return (
     <div className="space-y-10" data-testid="overview-page">
@@ -173,13 +188,7 @@ export default function OverviewPage() {
               {recentAlerts.map((a) => (
                 <div
                   key={a.id}
-                  className={`p-3 rounded-xl border ${
-                    a.severity === "critical"
-                      ? "bg-status-criticalBg border-status-critical/30"
-                      : a.severity === "warning"
-                      ? "bg-status-nearBg border-status-near/30"
-                      : "bg-brand-cream border-line"
-                  }`}
+                  className={`p-3 rounded-xl border ${alertSeverityClass(a.severity)}`}
                 >
                   <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.15em] text-ink-muted">
                     <Bell className="h-3 w-3" /> {a.kind}

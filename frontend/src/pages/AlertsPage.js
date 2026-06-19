@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Bell, Check, RefreshCw, AlertTriangle, AlertOctagon, Info } from "lucide-react";
 import { api } from "../lib/api";
@@ -19,7 +19,7 @@ export default function AlertsPage() {
 
   const canScan = ["manager", "admin"].includes(user?.role);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const { data } = await api.get("/alerts", { params: { limit: 200 } });
@@ -27,11 +27,11 @@ export default function AlertsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     load();
-  }, []);
+  }, [load]);
 
   const markRead = async (id) => {
     await api.post(`/alerts/${id}/read`);

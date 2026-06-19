@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Leaf, FileDown, TrendingDown } from "lucide-react";
 import {
   PieChart,
@@ -13,7 +13,7 @@ import {
   Legend,
 } from "recharts";
 import { toast } from "sonner";
-import { api, API } from "../lib/api";
+import { api } from "../lib/api";
 import { statusMeta, formatDateShort, daysLeftLabel } from "../lib/utils";
 import { useAuth } from "../contexts/AuthContext";
 
@@ -30,26 +30,34 @@ export default function ReportsPage() {
   const [summary, setSummary] = useState(null);
   const canExport = ["manager", "admin"].includes(user?.role);
 
-  useEffect(() => {
-    api.get("/reports/summary").then(({ data }) => setSummary(data)).catch(() => {});
+  const load = useCallback(async () => {
+    try {
+      const { data } = await api.get("/reports/summary");
+      setSummary(data);
+    } catch (err) {
+      if (process.env.NODE_ENV !== "production") {
+        console.warn("Reports load failed:", err?.message);
+      }
+    }
   }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const onExport = async () => {
     try {
-      const token = localStorage.getItem("token");
-      const res = await fetch(`${API}/reports/export`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error();
-      const blob = await res.blob();
+      const res = await api.get("/reports/export", { responseType: "blob" });
+      const url = URL.createObjectURL(res.data);
       const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
+      a.href = url;
       a.download = `inventory-${Date.now()}.xlsx`;
       document.body.appendChild(a);
       a.click();
       a.remove();
+      URL.revokeObjectURL(url);
       toast.success("Excel ready");
-    } catch {
+    } catch (_err) {
       toast.error("Export failed");
     }
   };
