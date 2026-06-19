@@ -60,3 +60,12 @@ See `/app/memory/test_credentials.md`. Admin: `admin@inventory.com / Admin@12345
 
 ## Build Log
 - **2026-06-19** — MVP implemented from scratch: backend + frontend + auth + OCR + dashboard + reports + tests. Backend 37/37 ✅.
+- **2026-06-19 (code review pass)** — Applied review findings:
+  - **Security**: switched JWT from `localStorage` to **HttpOnly + Secure + SameSite=Lax cookies** (both `/auth/login` and `/auth/register` set the cookie; new `/auth/logout` clears it). Bearer-header fallback preserved for API/test clients.
+  - **CORS**: tightened from `allow_origins=['*'] + allow_credentials=True` (browser-invalid) to an explicit regex matching preview-domain + localhost, or a literal `FRONTEND_URL`.
+  - **Refactor**: split `run_ocr_on_image()` into `_call_gemini_vision`, `_build_ocr_fields`, `_validate_ocr_fields`, `_parse_confidence`, `_extract_json_blob`. Split `create_product()` into `_validate_product_dates`, `_check_duplicate_product`, `_build_product_doc`, `_emit_product_status_alert`.
+  - **Perf**: added `load_threshold_map()` + `enrich_product_sync()` so dashboard/reports/exports/scan do **one** thresholds query instead of N+1.
+  - **UX**: register response now includes `role_overridden` boolean; frontend shows a warning toast when admin role is silently coerced to worker.
+  - **Frontend hygiene**: extracted `ProductModal` and `InventoryFilters` components (InventoryPage shrunk significantly), wrapped data-loader effects in `useCallback`, replaced silent empty-catch blocks with dev-mode `console.warn`, fixed array-index ticker key in LandingPage, removed all `localStorage` token usage.
+  - **Test hygiene**: backend test credentials now read from env (`TEST_ADMIN_EMAIL` / `TEST_ADMIN_PASSWORD` / `TEST_USER_PASSWORD`) with documented defaults.
+  - **Verified**: 43/43 backend tests passing (original 37 + 6 new cookie/logout/role_overridden tests).

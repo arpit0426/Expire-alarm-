@@ -540,17 +540,26 @@ async def lifespan(_app: FastAPI):
 app = FastAPI(title="Expiry Detection & Inventory Management", lifespan=lifespan)
 api = APIRouter(prefix="/api")
 
-# CORS — when allow_credentials=True is in play, "*" is rejected by browsers.
-# Use the configured FRONTEND_URL; "*" is preserved for non-credentialed clients.
-_cors_origins = ["*"] if FRONTEND_URL == "*" else [FRONTEND_URL]
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=_cors_origins,
-    allow_origin_regex=r"https://.*\.preview\.emergentagent\.com" if FRONTEND_URL == "*" else None,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# CORS — when allow_credentials=True is in play, wildcard "*" is rejected by browsers.
+# In dev (FRONTEND_URL=*) we accept the preview-domain pattern + localhost via regex.
+# In prod, set FRONTEND_URL to the explicit origin.
+if FRONTEND_URL == "*":
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[],
+        allow_origin_regex=r"https?://(localhost|127\.0\.0\.1|.+\.preview\.emergentagent\.com)(:\d+)?",
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+else:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[FRONTEND_URL],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
 
 # ---------------------------------------------------------------------------
