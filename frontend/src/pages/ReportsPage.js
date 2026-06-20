@@ -14,6 +14,7 @@ import {
 } from "recharts";
 import { toast } from "sonner";
 import { api } from "../lib/api";
+import { logger } from "../lib/logger";
 import { statusMeta, formatDateShort, daysLeftLabel } from "../lib/utils";
 import { useAuth } from "../contexts/AuthContext";
 
@@ -35,9 +36,7 @@ export default function ReportsPage() {
       const { data } = await api.get("/reports/summary");
       setSummary(data);
     } catch (err) {
-      if (process.env.NODE_ENV !== "production") {
-        console.warn("Reports load failed:", err?.message);
-      }
+      logger.warn("Reports load failed:", err?.message);
     }
   }, []);
 

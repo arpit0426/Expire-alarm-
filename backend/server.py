@@ -93,14 +93,14 @@ def serialize_doc(doc: dict) -> dict:
 # ---------------------------------------------------------------------------
 def hash_password(password: str) -> str:
     # bcrypt has a 72-byte input limit – truncate defensively.
-    pwd = password.encode("utf-8")[:72]
+    pwd: bytes = password.encode("utf-8")[:72]
     return bcrypt.hashpw(pwd, bcrypt.gensalt()).decode("utf-8")
 
 
 def verify_password(plain: str, hashed: str) -> bool:
     try:
         return bcrypt.checkpw(plain.encode("utf-8")[:72], hashed.encode("utf-8"))
-    except Exception:
+    except (ValueError, TypeError):
         return False
 
 
@@ -428,7 +428,7 @@ async def create_alert(
     severity: str = "info",
     product_id: Optional[str] = None,
     meta: Optional[dict] = None,
-):
+) -> None:
     await db.alerts.insert_one({
         "kind": kind,
         "message": message,

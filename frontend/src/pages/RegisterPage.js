@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { ArrowRight, CheckCircle2 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { formatApiErrorDetail } from "../lib/utils";
+import { formEnter } from "../lib/motion";
 
 const ROLES = [
   { value: "worker", label: "Worker", desc: "Scan products, view inventory & alerts." },
@@ -70,9 +71,7 @@ export default function RegisterPage() {
       <div className="flex flex-col items-center justify-center px-6 py-12 bg-brand-cream">
         <motion.form
           onSubmit={onSubmit}
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
+          {...formEnter}
           className="w-full max-w-md"
         >
           <Link to="/" className="lg:hidden flex items-center gap-2 mb-10">

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Save, UserCog, SlidersHorizontal } from "lucide-react";
 import { api } from "../lib/api";
+import { logger } from "../lib/logger";
 import { useAuth } from "../contexts/AuthContext";
 import { formatApiErrorDetail } from "../lib/utils";
 
@@ -14,12 +15,26 @@ export default function SettingsPage() {
   const canManage = ["manager", "admin"].includes(user?.role);
   const isAdmin = user?.role === "admin";
 
-  useEffect(() => {
-    api.get("/thresholds").then(({ data }) => setThresholds(data)).catch(() => {});
+  const loadAll = useCallback(async () => {
+    try {
+      const { data: t } = await api.get("/thresholds");
+      setThresholds(t);
+    } catch (err) {
+      logger.warn("Threshold load failed:", err?.message);
+    }
     if (isAdmin) {
-      api.get("/users").then(({ data }) => setUsers(data)).catch(() => {});
+      try {
+        const { data: u } = await api.get("/users");
+        setUsers(u);
+      } catch (err) {
+        logger.warn("Users load failed:", err?.message);
+      }
     }
   }, [isAdmin]);
+
+  useEffect(() => {
+    loadAll();
+  }, [loadAll]);
 
   const updateThresholdLocal = (cat, key, val) => {
     setThresholds((prev) => prev.map((t) => (t.category === cat ? { ...t, [key]: val } : t)));

@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { ArrowRight, CheckCircle2 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { formatApiErrorDetail } from "../lib/utils";
+import { formEnter } from "../lib/motion";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");

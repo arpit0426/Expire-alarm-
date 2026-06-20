@@ -12,6 +12,7 @@ import {
 } from "../lib/utils";
 import ProductModal from "../components/ProductModal";
 import InventoryFilters from "../components/InventoryFilters";
+import { rowFadeIn } from "../lib/motion";
 
 const STATUS_PILL_CLASSES = {
   pulse: "animate-pulse_dot",
@@ -184,8 +185,7 @@ export default function InventoryPage() {
                   return (
                     <motion.tr
                       key={p.id}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
+                      {...rowFadeIn}
                       className="hover:bg-brand-cream/60 transition"
                       data-testid={`inventory-row-${p.id}`}
                     >

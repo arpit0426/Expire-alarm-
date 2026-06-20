@@ -13,8 +13,10 @@ import {
   Leaf,
 } from "lucide-react";
 import { api } from "../lib/api";
+import { logger } from "../lib/logger";
 import { statusMeta, formatDateShort, daysLeftLabel } from "../lib/utils";
 import { useAuth } from "../contexts/AuthContext";
+import { fadeInKpi } from "../lib/motion";
 
 const KPI_DEFS = [
   { key: "total", label: "Total Products", icon: Boxes, accent: "bg-brand-primary" },
@@ -53,9 +55,7 @@ export default function OverviewPage() {
 
   useEffect(() => {
     load().catch((err) => {
-      if (process.env.NODE_ENV !== "production") {
-        console.warn("Overview load failed:", err?.message);
-      }
+      logger.warn("Overview load failed:", err?.message);
     });
   }, [load]);
 
@@ -100,9 +100,7 @@ export default function OverviewPage() {
           return (
             <motion.div
               key={k.key}
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, delay: i * 0.05 }}
+              {...fadeInKpi(i)}
               data-testid={`kpi-${k.key}`}
               className="relative bg-surface border border-line rounded-2xl p-5 sm:p-6 overflow-hidden hover:-translate-y-0.5 hover:shadow-soft transition"
             >
