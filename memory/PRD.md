@@ -60,12 +60,27 @@ See `/app/memory/test_credentials.md`. Admin: `admin@inventory.com / Admin@12345
 
 ## Build Log
 - **2026-06-19** — MVP implemented from scratch: backend + frontend + auth + OCR + dashboard + reports + tests. Backend 37/37 ✅.
-- **2026-06-19 (code review pass)** — Applied review findings:
+
+### Code review pass 1 (2026-06-19)
   - **Security**: switched JWT from `localStorage` to **HttpOnly + Secure + SameSite=Lax cookies** (both `/auth/login` and `/auth/register` set the cookie; new `/auth/logout` clears it). Bearer-header fallback preserved for API/test clients.
   - **CORS**: tightened from `allow_origins=['*'] + allow_credentials=True` (browser-invalid) to an explicit regex matching preview-domain + localhost, or a literal `FRONTEND_URL`.
   - **Refactor**: split `run_ocr_on_image()` into `_call_gemini_vision`, `_build_ocr_fields`, `_validate_ocr_fields`, `_parse_confidence`, `_extract_json_blob`. Split `create_product()` into `_validate_product_dates`, `_check_duplicate_product`, `_build_product_doc`, `_emit_product_status_alert`.
   - **Perf**: added `load_threshold_map()` + `enrich_product_sync()` so dashboard/reports/exports/scan do **one** thresholds query instead of N+1.
   - **UX**: register response now includes `role_overridden` boolean; frontend shows a warning toast when admin role is silently coerced to worker.
-  - **Frontend hygiene**: extracted `ProductModal` and `InventoryFilters` components (InventoryPage shrunk significantly), wrapped data-loader effects in `useCallback`, replaced silent empty-catch blocks with dev-mode `console.warn`, fixed array-index ticker key in LandingPage, removed all `localStorage` token usage.
-  - **Test hygiene**: backend test credentials now read from env (`TEST_ADMIN_EMAIL` / `TEST_ADMIN_PASSWORD` / `TEST_USER_PASSWORD`) with documented defaults.
+  - **Frontend hygiene**: extracted `ProductModal` and `InventoryFilters` components, wrapped data-loader effects in `useCallback`, fixed array-index ticker key, removed all `localStorage` token usage.
+  - **Test hygiene**: credentials now from env (`TEST_ADMIN_EMAIL` / `TEST_ADMIN_PASSWORD` / `TEST_USER_PASSWORD`).
   - **Verified**: 43/43 backend tests passing (original 37 + 6 new cookie/logout/role_overridden tests).
+
+### Code review pass 2 (2026-06-19)
+  - **ScanPage decomposed**: 356 → **95 lines** (-73%). Logic extracted into `useCameraCapture()` and `useOcrProcessor()` custom hooks; UI into `CameraPanel` / `ScanResults` / `ConfidenceBar` / `VerifyForm` subcomponents. Magic numbers (`800x600`, `0.85`) named.
+  - **LandingPage decomposed**: 352 → **36 lines** (-90%). Split into `LandingNav`, `LandingHero`, `ImpactStats`, `Features`, `HowItWorks`, `CallToAction`, `LandingFooter`.
+  - **ProductModal decomposed**: form state lifted into `useProductForm()` hook; rendered via `ProductFormFields` + `ModalActions` subcomponents. Save-button label is now a small helper (no nested ternary).
+  - **Centralized motion presets** in `/lib/motion.js` — `fadeInUp`, `fadeInUpDelayed`, `fadeInScrollStaggered`, `fadeInKpi`, `formEnter`, `modalEnter`, `resultEnter`, `rowFadeIn` — eliminating ~40 fresh-allocation inline `initial`/`animate`/`transition` props across pages.
+  - **Logger utility** `/lib/logger.js` replaces ad-hoc `console.warn`/`process.env.NODE_ENV` checks. No-op in production builds.
+  - **Backend**: `verify_password()` exception narrowed from bare `Exception` to `(ValueError, TypeError)`. `hash_password()` got explicit `bytes` typing. `create_alert()` got `-> None` return hint.
+  - **Verified**: 43/43 backend tests still passing (no regression). Frontend lint 0 errors.
+
+  **Non-changes (verified false positives in the report):**
+  - `is None` / `is not None` on `server.py:364/676/763` are the **correct** PEP 8 idiom — not changed.
+  - `"access_token="` in `backend_test.py:437/458/502` is the **cookie attribute name** the tests assert on, not a credential — not changed.
+  - `useCallback`/`useEffect` empty deps in `AuthContext`/`DashboardLayout`/`InventoryPage` reference only module-imported `api` and stable `useState` setters — ESLint `react-hooks/exhaustive-deps` reports zero warnings — not changed.
