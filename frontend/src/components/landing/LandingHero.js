@@ -10,8 +10,16 @@ export default function LandingHero() {
     target: ref,
     offset: ["start start", "end start"],
   });
+  // Parallax + zoom: as the user scrolls, the floating scan card zooms in slightly,
+  // the headline drifts up, the radial blobs swell, and overall opacity tapers.
   const heroTilt = useTransform(scrollYProgress, [0, 1], [0, -8]);
   const heroOpacity = useTransform(scrollYProgress, [0, 1], [1, 0.2]);
+  const cardScale = useTransform(scrollYProgress, [0, 0.6], [1, 1.18]);
+  const cardY = useTransform(scrollYProgress, [0, 1], [0, -90]);
+  const blob1Scale = useTransform(scrollYProgress, [0, 1], [1, 1.45]);
+  const blob2Scale = useTransform(scrollYProgress, [0, 1], [1, 1.55]);
+  const headlineY = useTransform(scrollYProgress, [0, 1], [0, -60]);
+  const headlineScale = useTransform(scrollYProgress, [0, 1], [1, 1.05]);
 
   return (
     <section
@@ -21,11 +29,17 @@ export default function LandingHero() {
     >
       <motion.div
         className="absolute -right-40 top-20 w-[680px] h-[680px] rounded-full opacity-50 blur-3xl"
-        style={{ background: "radial-gradient(closest-side, #3A7D44, transparent)" }}
+        style={{
+          background: "radial-gradient(closest-side, #3A7D44, transparent)",
+          scale: blob1Scale,
+        }}
       />
       <motion.div
         className="absolute -left-32 bottom-0 w-[480px] h-[480px] rounded-full opacity-40 blur-3xl"
-        style={{ background: "radial-gradient(closest-side, #E4A11B, transparent)" }}
+        style={{
+          background: "radial-gradient(closest-side, #E4A11B, transparent)",
+          scale: blob2Scale,
+        }}
       />
       <motion.div
         className="absolute right-1/3 top-2/3 w-[420px] h-[420px] rounded-full opacity-25 blur-3xl"
@@ -33,8 +47,8 @@ export default function LandingHero() {
       />
 
       <motion.div
-        style={{ rotate: heroTilt, opacity: heroOpacity }}
-        className="absolute right-6 sm:right-16 top-32 hidden md:block"
+        style={{ rotate: heroTilt, opacity: heroOpacity, scale: cardScale, y: cardY }}
+        className="absolute right-6 sm:right-16 top-32 hidden md:block will-change-transform"
       >
         <div className="relative w-[360px] h-[460px] rounded-3xl overflow-hidden shadow-2xl border-4 border-brand-accent rotate-[6deg]">
           <img
@@ -74,7 +88,8 @@ export default function LandingHero() {
 
         <motion.h1
           {...fadeInUpDelayed(0.1)}
-          className="font-display text-[14vw] sm:text-[10vw] md:text-8xl xl:text-9xl font-black leading-[0.95] mt-8 max-w-5xl"
+          style={{ y: headlineY, scale: headlineScale }}
+          className="font-display text-[14vw] sm:text-[10vw] md:text-8xl xl:text-9xl font-black leading-[0.95] mt-8 max-w-5xl will-change-transform"
         >
           Stop tossing <span className="italic text-brand-accent">good food</span>.
           <br />

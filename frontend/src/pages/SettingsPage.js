@@ -1,19 +1,70 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Save, UserCog, SlidersHorizontal } from "lucide-react";
+import { Save, UserCog, SlidersHorizontal, Store as StoreIcon } from "lucide-react";
 import { api } from "../lib/api";
 import { logger } from "../lib/logger";
 import { useAuth } from "../contexts/AuthContext";
+import { useStore } from "../contexts/StoreContext";
 import { formatApiErrorDetail } from "../lib/utils";
+
+const inputCls =
+  "w-full bg-white border border-line rounded-xl px-3 py-2.5 text-ink text-sm font-sans focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/15 outline-none";
+
+function StoreField({ label, children }) {
+  return (
+    <div>
+      <label className="block font-mono text-[10px] uppercase tracking-[0.16em] text-ink-muted mb-1.5">
+        {label}
+      </label>
+      {children}
+    </div>
+  );
+}
 
 export default function SettingsPage() {
   const { user } = useAuth();
+  const { store, refresh: refreshStore } = useStore();
   const [thresholds, setThresholds] = useState([]);
   const [users, setUsers] = useState([]);
   const [saving, setSaving] = useState({});
+  const [storeDraft, setStoreDraft] = useState(null);
+  const [savingStore, setSavingStore] = useState(false);
 
   const canManage = ["manager", "admin"].includes(user?.role);
   const isAdmin = user?.role === "admin";
+
+  // Sync draft when store loads/changes
+  useEffect(() => {
+    if (store) {
+      setStoreDraft({
+        name: store.name || "",
+        owner_name: store.owner_name || "",
+        manager_name: store.manager_name || "",
+        location: store.location || "",
+        currency: store.currency || "INR",
+        tagline: store.tagline || "",
+      });
+    }
+  }, [store]);
+
+  const updateStoreField = (k, v) => setStoreDraft((d) => ({ ...d, [k]: v }));
+
+  const saveStore = async () => {
+    if (!storeDraft || !storeDraft.name) {
+      toast.error("Store name is required");
+      return;
+    }
+    setSavingStore(true);
+    try {
+      await api.put("/store", storeDraft);
+      await refreshStore();
+      toast.success("Store profile saved");
+    } catch (e) {
+      toast.error(formatApiErrorDetail(e?.response?.data?.detail) || "Save failed");
+    } finally {
+      setSavingStore(false);
+    }
+  };
 
   const loadAll = useCallback(async () => {
     try {
@@ -76,6 +127,89 @@ export default function SettingsPage() {
           Tune the <span className="italic text-brand-primary">rules</span>.
         </h1>
       </div>
+
+      {/* Store profile (admin-only) */}
+      {isAdmin && storeDraft && (
+        <div className="glass rounded-2xl p-6" data-testid="store-editor">
+          <div className="flex items-center gap-3 mb-5">
+            <div className="h-10 w-10 rounded-xl bg-brand-accent/30 grid place-items-center">
+              <StoreIcon className="h-5 w-5 text-brand-dark" />
+            </div>
+            <div>
+              <h3 className="font-display text-xl font-bold text-ink">Store profile</h3>
+              <p className="text-sm text-ink-soft">
+                What every signed-in user sees in their sidebar and on the home dashboard.
+              </p>
+            </div>
+          </div>
+          <div className="grid sm:grid-cols-2 gap-4">
+            <StoreField label="Store name *">
+              <input
+                data-testid="store-name-input"
+                value={storeDraft.name}
+                onChange={(e) => updateStoreField("name", e.target.value)}
+                className={inputCls}
+                placeholder="e.g. Sharma & Sons Bazaar"
+              />
+            </StoreField>
+            <StoreField label="Tagline">
+              <input
+                data-testid="store-tagline-input"
+                value={storeDraft.tagline}
+                onChange={(e) => updateStoreField("tagline", e.target.value)}
+                className={inputCls}
+                placeholder="e.g. Fresh today, sold today"
+              />
+            </StoreField>
+            <StoreField label="Owner name">
+              <input
+                data-testid="store-owner-input"
+                value={storeDraft.owner_name}
+                onChange={(e) => updateStoreField("owner_name", e.target.value)}
+                className={inputCls}
+                placeholder="e.g. Anjali Sharma"
+              />
+            </StoreField>
+            <StoreField label="Manager name">
+              <input
+                data-testid="store-manager-input"
+                value={storeDraft.manager_name}
+                onChange={(e) => updateStoreField("manager_name", e.target.value)}
+                className={inputCls}
+                placeholder="e.g. Ravi Kumar"
+              />
+            </StoreField>
+            <StoreField label="Location">
+              <input
+                data-testid="store-location-input"
+                value={storeDraft.location}
+                onChange={(e) => updateStoreField("location", e.target.value)}
+                className={inputCls}
+                placeholder="e.g. Sector 18, Noida"
+              />
+            </StoreField>
+            <StoreField label="Currency">
+              <input
+                data-testid="store-currency-input"
+                value={storeDraft.currency}
+                onChange={(e) => updateStoreField("currency", e.target.value)}
+                className={inputCls}
+                placeholder="INR / USD / EUR"
+              />
+            </StoreField>
+          </div>
+          <div className="flex justify-end mt-5">
+            <button
+              data-testid="store-save-btn"
+              onClick={saveStore}
+              disabled={savingStore || !storeDraft.name}
+              className="inline-flex items-center gap-2 bg-brand-primary text-white font-semibold px-5 py-2.5 rounded-full hover:bg-brand-primaryHover shadow-glow disabled:opacity-60"
+            >
+              <Save className="h-4 w-4" /> {savingStore ? "Saving…" : "Save store profile"}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Thresholds */}
       <div className="glass rounded-2xl p-6">

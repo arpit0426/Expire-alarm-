@@ -16,6 +16,7 @@ import { api } from "../lib/api";
 import { logger } from "../lib/logger";
 import { statusMeta, formatDateShort, daysLeftLabel } from "../lib/utils";
 import { useAuth } from "../contexts/AuthContext";
+import { useStore } from "../contexts/StoreContext";
 import { fadeInKpi } from "../lib/motion";
 
 const KPI_DEFS = [
@@ -38,6 +39,7 @@ function alertSeverityClass(sev) {
 
 export default function OverviewPage() {
   const { user } = useAuth();
+  const { store } = useStore();
   const [summary, setSummary] = useState(null);
   const [recent, setRecent] = useState([]);
   const [recentAlerts, setRecentAlerts] = useState([]);
@@ -61,6 +63,52 @@ export default function OverviewPage() {
 
   return (
     <div className="space-y-10" data-testid="overview-page">
+      {/* Store header card */}
+      {store && (
+        <div className="relative glass rounded-3xl p-6 sm:p-8 overflow-hidden" data-testid="store-header">
+          <div className="absolute -top-12 -right-12 h-48 w-48 rounded-full bg-brand-accent/15 blur-3xl" />
+          <div className="absolute -bottom-12 -left-12 h-44 w-44 rounded-full bg-brand-primary/15 blur-3xl" />
+          <div className="relative flex flex-col md:flex-row md:items-end md:justify-between gap-6">
+            <div>
+              <div className="font-mono text-[11px] uppercase tracking-[0.22em] text-brand-primary mb-2">
+                / Store profile
+              </div>
+              <h2 className="font-display text-4xl sm:text-5xl font-black text-ink tracking-tight" data-testid="store-name-display">
+                {store.name}
+              </h2>
+              {store.tagline && (
+                <p className="font-sans text-ink-soft mt-1 max-w-xl">{store.tagline}</p>
+              )}
+              <div className="flex flex-wrap gap-x-6 gap-y-1 mt-4 font-mono text-xs text-ink-soft">
+                {store.owner_name && (
+                  <div data-testid="store-owner">
+                    <span className="uppercase tracking-[0.15em] text-ink-muted">Owner</span>
+                    <span className="ml-2 text-ink font-semibold">{store.owner_name}</span>
+                  </div>
+                )}
+                {store.manager_name && (
+                  <div data-testid="store-manager">
+                    <span className="uppercase tracking-[0.15em] text-ink-muted">Manager</span>
+                    <span className="ml-2 text-ink font-semibold">{store.manager_name}</span>
+                  </div>
+                )}
+                {store.location && store.location !== "—" && (
+                  <div>
+                    <span className="uppercase tracking-[0.15em] text-ink-muted">Location</span>
+                    <span className="ml-2 text-ink font-semibold">{store.location}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="hidden md:flex items-center gap-2 font-mono text-xs">
+              <span className="px-3 py-1.5 rounded-full bg-brand-primarySoft text-brand-primary font-bold uppercase tracking-widest">
+                Signed in · {user?.role}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Heading */}
       <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-5">
         <div>

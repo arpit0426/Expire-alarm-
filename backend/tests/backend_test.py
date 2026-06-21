@@ -10,7 +10,7 @@ import requests
 
 BASE_URL = os.environ.get(
     "REACT_APP_BACKEND_URL",
-    "https://c0793a4a-13eb-4092-9505-41f826a6037d.preview.emergentagent.com",
+    "https://inventory-ai-69.preview.emergentagent.com",
 ).rstrip("/")
 API = f"{BASE_URL}/api"
 

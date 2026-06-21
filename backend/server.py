@@ -240,6 +240,107 @@ class UpdateUserRoleIn(BaseModel):
     role: str
 
 
+class StoreIn(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    owner_name: Optional[str] = ""
+    manager_name: Optional[str] = ""
+    location: Optional[str] = ""
+    currency: Optional[str] = "INR"
+    tagline: Optional[str] = ""
+
+
+# ---------------------------------------------------------------------------
+# Tiered expiry alerts — six warning bands + expired
+# ---------------------------------------------------------------------------
+# Each tier: (key, label, hours_remaining_threshold, severity, recommendation)
+# A product matches the FIRST tier whose threshold ≥ hours_remaining.
+EXPIRY_TIERS = [
+    {
+        "key": "tier_3h",
+        "label": "3 hours",
+        "hours": 3,
+        "severity": "critical",
+        "recommendation": "Critical — apply heavy discount, bundle, or donate before close.",
+    },
+    {
+        "key": "tier_6h",
+        "label": "6 hours",
+        "hours": 6,
+        "severity": "critical",
+        "recommendation": "Urgent — clear stock now: 40–60% off or staff-pick promo.",
+    },
+    {
+        "key": "tier_24h",
+        "label": "24 hours",
+        "hours": 24,
+        "severity": "critical",
+        "recommendation": "Priority sale recommended — apply 25%+ discount today.",
+    },
+    {
+        "key": "tier_3d",
+        "label": "3 days",
+        "hours": 24 * 3,
+        "severity": "warning",
+        "recommendation": "Move product to promotional display near checkout.",
+    },
+    {
+        "key": "tier_1w",
+        "label": "1 week",
+        "hours": 24 * 7,
+        "severity": "warning",
+        "recommendation": "Apply 10–15% discount; flag for combo-pack with fast-mover.",
+    },
+    {
+        "key": "tier_1m",
+        "label": "1 month",
+        "hours": 24 * 30,
+        "severity": "info",
+        "recommendation": "Plan a promotional campaign; rotate stock to front of shelf.",
+    },
+]
+
+
+def classify_expiry_tier(exp_date_str: Optional[str]) -> Optional[dict]:
+    """Return the tightest active tier for a product, or 'expired', or None (safe)."""
+    d = parse_date(exp_date_str)
+    if not d:
+        return None
+    now = datetime.now(timezone.utc)
+    exp_dt = datetime.combine(d, datetime.min.time()).replace(tzinfo=timezone.utc)
+    delta_hours = (exp_dt - now).total_seconds() / 3600.0
+    if delta_hours < 0:
+        return {
+            "key": "expired",
+            "label": "expired",
+            "hours": -1,
+            "severity": "critical",
+            "recommendation": "Pull from shelf immediately; document loss / dispose per SOP.",
+        }
+    for tier in EXPIRY_TIERS:
+        if delta_hours <= tier["hours"]:
+            return tier
+    return None
+
+
+def humanize_remaining(exp_date_str: Optional[str]) -> str:
+    d = parse_date(exp_date_str)
+    if not d:
+        return "—"
+    now = datetime.now(timezone.utc)
+    exp_dt = datetime.combine(d, datetime.min.time()).replace(tzinfo=timezone.utc)
+    delta = exp_dt - now
+    secs = int(delta.total_seconds())
+    if secs < 0:
+        days = abs(secs) // 86400
+        return f"expired {days}d ago" if days > 0 else "expired today"
+    if secs < 3600:
+        return f"{secs // 60} min left"
+    if secs < 86400:
+        return f"{secs // 3600} h left"
+    days = secs // 86400
+    return f"{days}d left"
+
+
 # ---------------------------------------------------------------------------
 # Helpers: date parsing / status
 # ---------------------------------------------------------------------------
@@ -441,19 +542,34 @@ async def create_alert(
 
 
 async def _emit_product_status_alert(saved: dict) -> None:
-    status_ = saved["status"]
-    if status_ not in ("near_expiry", "critical", "expired"):
-        return
-    if status_ == "expired":
-        message = f"{saved['product_name']} (batch {saved['batch_number']}) is EXPIRED"
-        severity = "critical"
+    """Emit a tiered expiry alert with sales recommendation."""
+    tier = classify_expiry_tier(saved.get("exp_date"))
+    if not tier:
+        return  # safe — nothing to alert
+    remaining = humanize_remaining(saved.get("exp_date"))
+    pname = saved["product_name"]
+    batch = saved["batch_number"]
+    if tier["key"] == "expired":
+        message = f"{pname} (batch {batch}) is EXPIRED ({remaining})."
     else:
         message = (
-            f"{saved['product_name']} (batch {saved['batch_number']}) is "
-            f"{status_.replace('_', ' ')}"
+            f"{pname} (batch {batch}) will expire in {tier['label']} "
+            f"({remaining}). {tier['recommendation']}"
         )
-        severity = "warning" if status_ == "near_expiry" else "critical"
-    await create_alert(status_, message, severity=severity, product_id=saved["id"])
+    await create_alert(
+        kind=f"expiry_{tier['key']}",
+        message=message,
+        severity=tier["severity"],
+        product_id=saved["id"],
+        meta={
+            "tier_key": tier["key"],
+            "tier_label": tier["label"],
+            "recommendation": tier["recommendation"],
+            "remaining": remaining,
+            "product_name": pname,
+            "batch_number": batch,
+        },
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -534,6 +650,16 @@ async def lifespan(_app: FastAPI):
             {"$setOnInsert": d},
             upsert=True,
         )
+
+    # Seed default store profile (idempotent)
+    await db.store.update_one(
+        {"_id": "default"},
+        {"$setOnInsert": {
+            **DEFAULT_STORE,
+            "updated_at": datetime.now(timezone.utc),
+        }},
+        upsert=True,
+    )
     yield
 
 
@@ -840,15 +966,76 @@ async def read_all_alerts(_user: dict = Depends(get_current_user)):
 
 @api.post("/alerts/scan")
 async def scan_alerts(_user: dict = Depends(require_roles("manager", "admin"))):
-    """Re-scan all products and emit alerts for any near-expiry / critical / expired ones."""
+    """Re-scan all products and emit tiered expiry alerts (deduped per product+tier per 12h)."""
     cache = await load_threshold_map()
     created = 0
+    skipped = 0
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=12)
     async for p in db.products.find():
         p = enrich_product_sync(serialize_doc(p), cache)
-        if p["status"] in ("near_expiry", "critical", "expired"):
-            await _emit_product_status_alert(p)
-            created += 1
-    return {"alerts_created": created}
+        tier = classify_expiry_tier(p.get("exp_date"))
+        if not tier:
+            continue
+        kind = f"expiry_{tier['key']}"
+        # Skip if we already emitted this exact (product, tier) within the dedup window
+        dup = await db.alerts.find_one({
+            "product_id": p["id"],
+            "kind": kind,
+            "created_at": {"$gte": cutoff},
+        })
+        if dup:
+            skipped += 1
+            continue
+        await _emit_product_status_alert(p)
+        created += 1
+    return {"alerts_created": created, "alerts_skipped_duplicate": skipped}
+
+
+# ---------------------------------------------------------------------------
+# Store profile
+# ---------------------------------------------------------------------------
+DEFAULT_STORE = {
+    "name": "FreshTrack Bazaar",
+    "owner_name": "Store Owner",
+    "manager_name": "Floor Manager",
+    "location": "—",
+    "currency": "INR",
+    "tagline": "Fresh today, sold today.",
+}
+
+
+async def get_store() -> dict:
+    s = await db.store.find_one({"_id": "default"})
+    if not s:
+        doc = {"_id": "default", **DEFAULT_STORE,
+               "updated_at": datetime.now(timezone.utc)}
+        await db.store.insert_one(doc)
+        s = doc
+    s = {**s}
+    s.pop("_id", None)
+    if isinstance(s.get("updated_at"), datetime):
+        s["updated_at"] = s["updated_at"].isoformat()
+    return s
+
+
+@api.get("/store")
+async def read_store(_user: dict = Depends(get_current_user)):
+    return await get_store()
+
+
+@api.put("/store")
+async def update_store(
+    body: StoreIn,
+    _user: dict = Depends(require_roles("admin")),
+):
+    payload = body.model_dump()
+    payload["updated_at"] = datetime.now(timezone.utc)
+    await db.store.update_one(
+        {"_id": "default"},
+        {"$set": payload},
+        upsert=True,
+    )
+    return await get_store()
 
 
 # ---------------------------------------------------------------------------

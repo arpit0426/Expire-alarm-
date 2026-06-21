@@ -11,6 +11,17 @@ const SEVERITY_META = {
   info: { icon: Info, cls: "bg-brand-primary/10 border-brand-primary/30 text-brand-primary" },
 };
 
+function tierBadgeFromKind(kind) {
+  if (kind === "expiry_expired") return "EXPIRED";
+  if (kind === "expiry_tier_3h") return "3 HOURS LEFT";
+  if (kind === "expiry_tier_6h") return "6 HOURS LEFT";
+  if (kind === "expiry_tier_24h") return "24 HOURS LEFT";
+  if (kind === "expiry_tier_3d") return "3 DAYS LEFT";
+  if (kind === "expiry_tier_1w") return "1 WEEK LEFT";
+  if (kind === "expiry_tier_1m") return "1 MONTH LEFT";
+  return (kind || "ALERT").toUpperCase();
+}
+
 export default function AlertsPage() {
   const { user } = useAuth();
   const [alerts, setAlerts] = useState([]);
@@ -113,12 +124,20 @@ export default function AlertsPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="font-mono text-[10px] uppercase tracking-[0.16em] font-bold">{a.kind}</span>
+                      <span className="font-mono text-[10px] uppercase tracking-[0.16em] font-bold">
+                        {tierBadgeFromKind(a.kind)}
+                      </span>
                       {!a.read && <span className="h-1.5 w-1.5 rounded-full bg-brand-accent animate-pulse_dot" />}
                     </div>
                     <div className="font-display font-semibold text-ink mt-0.5 text-base">
                       {a.message}
                     </div>
+                    {a.meta?.recommendation && (
+                      <div className="mt-2 text-sm text-ink-soft">
+                        <span className="font-bold text-brand-primary">Action ▸</span>{" "}
+                        {a.meta.recommendation}
+                      </div>
+                    )}
                     <div className="font-mono text-[11px] text-ink-muted mt-1">
                       {formatDateShort(a.created_at)}
                     </div>

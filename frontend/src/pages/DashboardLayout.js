@@ -13,8 +13,10 @@ import {
   X,
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
+import { useStore } from "../contexts/StoreContext";
 import { api } from "../lib/api";
 import { logger } from "../lib/logger";
+import ExpiryNotifier from "../components/ExpiryNotifier";
 
 const NAV = [
   { to: "/app", label: "Overview", icon: LayoutDashboard, end: true, testid: "nav-overview" },
@@ -48,6 +50,7 @@ function NavItem({ to, end, label, icon: Icon, testid, onClick }) {
 
 export default function DashboardLayout() {
   const { user, logout } = useAuth();
+  const { store } = useStore();
   const [unread, setUnread] = useState(0);
   const [mobileOpen, setMobileOpen] = useState(false);
   const navigate = useNavigate();
@@ -109,22 +112,41 @@ export default function DashboardLayout() {
           <div className="h-9 w-9 rounded-xl bg-brand-primary grid place-items-center shadow-glow">
             <CheckCircle2 className="h-5 w-5 text-brand-accent" strokeWidth={2.5} />
           </div>
-          <span className="font-display text-2xl tracking-tight">
-            fresh<span className="text-brand-accent">track</span>.
-          </span>
+          <div className="flex flex-col leading-tight">
+            <span className="font-display text-xl tracking-tight" data-testid="sidebar-store-name">
+              {store?.name || "freshtrack."}
+            </span>
+            {store?.tagline && (
+              <span className="font-mono text-[10px] text-brand-cream/60 uppercase tracking-[0.15em] mt-0.5">
+                {store.tagline.length > 28 ? store.tagline.slice(0, 26) + "…" : store.tagline}
+              </span>
+            )}
+          </div>
         </Link>
 
-        <div className="mt-12 lg:mt-2 mb-4 px-3 py-3 bg-brand-cream/5 rounded-xl">
-          <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-brand-cream/50 mb-1">
+        <div className="mt-12 lg:mt-2 mb-4 px-3 py-3 bg-brand-cream/5 rounded-xl space-y-1.5">
+          <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-brand-cream/50">
             Signed in as
           </div>
           <div className="font-display text-lg font-semibold leading-tight">{user?.name || "—"}</div>
-          <div className="text-xs text-brand-cream/60 font-mono mt-1">
-            {user?.email}
-          </div>
-          <div className="inline-flex mt-2 px-2 py-0.5 rounded-full bg-brand-accent text-brand-dark text-[10px] font-mono font-bold uppercase tracking-widest">
+          <div className="text-xs text-brand-cream/60 font-mono">{user?.email}</div>
+          <div className="inline-flex px-2 py-0.5 rounded-full bg-brand-accent text-brand-dark text-[10px] font-mono font-bold uppercase tracking-widest">
             {user?.role}
           </div>
+          {(store?.owner_name || store?.manager_name) && (
+            <div className="mt-2 pt-2 border-t border-brand-cream/10 space-y-0.5">
+              {store?.owner_name && (
+                <div className="text-[11px] text-brand-cream/60 font-mono">
+                  <span className="text-brand-cream/40">Owner</span> · {store.owner_name}
+                </div>
+              )}
+              {store?.manager_name && (
+                <div className="text-[11px] text-brand-cream/60 font-mono">
+                  <span className="text-brand-cream/40">Mgr</span> · {store.manager_name}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <nav className="flex flex-col gap-1.5">
@@ -176,6 +198,9 @@ export default function DashboardLayout() {
           <Outlet />
         </div>
       </main>
+
+      {/* Floating popup notifications for tiered expiry alerts */}
+      <ExpiryNotifier />
     </div>
   );
 }
