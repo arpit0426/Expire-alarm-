@@ -614,6 +614,19 @@ def _build_product_doc(body: ProductIn, user_id: str) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Store profile defaults (declared before lifespan() which seeds it)
+# ---------------------------------------------------------------------------
+DEFAULT_STORE = {
+    "name": "FreshTrack Bazaar",
+    "owner_name": "Store Owner",
+    "manager_name": "Floor Manager",
+    "location": "—",
+    "currency": "INR",
+    "tagline": "Fresh today, sold today.",
+}
+
+
+# ---------------------------------------------------------------------------
 # App lifecycle
 # ---------------------------------------------------------------------------
 @asynccontextmanager
@@ -992,18 +1005,9 @@ async def scan_alerts(_user: dict = Depends(require_roles("manager", "admin"))):
 
 
 # ---------------------------------------------------------------------------
-# Store profile
 # ---------------------------------------------------------------------------
-DEFAULT_STORE = {
-    "name": "FreshTrack Bazaar",
-    "owner_name": "Store Owner",
-    "manager_name": "Floor Manager",
-    "location": "—",
-    "currency": "INR",
-    "tagline": "Fresh today, sold today.",
-}
-
-
+# Store profile endpoints
+# ---------------------------------------------------------------------------
 async def get_store() -> dict:
     s = await db.store.find_one({"_id": "default"})
     if not s:
