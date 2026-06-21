@@ -16,16 +16,20 @@ export default function LandingHero() {
   return (
     <section
       ref={ref}
-      className="relative min-h-screen bg-brand-dark text-brand-cream grain overflow-hidden"
+      className="relative min-h-screen bg-brand-dark text-brand-cream grain paisley-soft overflow-hidden"
       data-testid="hero-section"
     >
       <motion.div
-        className="absolute -right-40 top-20 w-[680px] h-[680px] rounded-full opacity-40 blur-3xl"
-        style={{ background: "radial-gradient(closest-side, #259E7E, transparent)" }}
+        className="absolute -right-40 top-20 w-[680px] h-[680px] rounded-full opacity-50 blur-3xl"
+        style={{ background: "radial-gradient(closest-side, #3A7D44, transparent)" }}
       />
       <motion.div
-        className="absolute -left-32 bottom-0 w-[480px] h-[480px] rounded-full opacity-30 blur-3xl"
-        style={{ background: "radial-gradient(closest-side, #C1D544, transparent)" }}
+        className="absolute -left-32 bottom-0 w-[480px] h-[480px] rounded-full opacity-40 blur-3xl"
+        style={{ background: "radial-gradient(closest-side, #E4A11B, transparent)" }}
+      />
+      <motion.div
+        className="absolute right-1/3 top-2/3 w-[420px] h-[420px] rounded-full opacity-25 blur-3xl"
+        style={{ background: "radial-gradient(closest-side, #B0533C, transparent)" }}
       />
 
       <motion.div
@@ -39,7 +43,7 @@ export default function LandingHero() {
             className="w-full h-full object-cover"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-brand-dark/60 via-transparent to-transparent" />
-          <div className="absolute bottom-6 left-6 right-6 bg-brand-cream/95 backdrop-blur rounded-2xl p-4 font-mono text-xs text-ink">
+          <div className="absolute bottom-6 left-6 right-6 glass-strong rounded-2xl p-4 font-mono text-xs text-ink">
             <div className="flex items-center justify-between mb-2">
               <span className="font-bold">SCAN.0427</span>
               <span className="px-2 py-0.5 rounded-full bg-status-safeBg text-status-safe font-bold">
@@ -61,10 +65,11 @@ export default function LandingHero() {
       <div className="relative max-w-7xl mx-auto px-6 sm:px-10 pt-44 sm:pt-52 pb-32">
         <motion.div
           {...fadeInUp}
-          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-brand-cream/10 border border-brand-cream/15 font-mono text-[11px] tracking-[0.18em] uppercase"
+          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full glass-dark font-mono text-[11px] tracking-[0.18em] uppercase"
           data-testid="hero-eyebrow"
         >
-          <Sparkles className="h-3.5 w-3.5 text-brand-accent" /> AI-powered · Built for retail floors
+          <Sparkles className="h-3.5 w-3.5 text-brand-accent" />
+          <span>ताज़ा · AI-powered · Built for retail floors</span>
         </motion.div>
 
         <motion.h1

@@ -33,7 +33,7 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen grid lg:grid-cols-2" data-testid="login-page">
       {/* Left visual */}
-      <div className="relative bg-brand-dark text-brand-cream hidden lg:block grain overflow-hidden">
+      <div className="relative bg-brand-dark text-brand-cream hidden lg:block grain paisley-soft overflow-hidden">
         <div className="absolute -top-32 -left-20 w-[500px] h-[500px] rounded-full bg-brand-primary/40 blur-3xl" />
         <div className="absolute bottom-0 right-0 w-[400px] h-[400px] rounded-full bg-brand-accent/30 blur-3xl" />
         <div className="relative h-full flex flex-col p-12 xl:p-16">
@@ -61,13 +61,11 @@ export default function LoginPage() {
       </div>
 
       {/* Right form */}
-      <div className="flex flex-col items-center justify-center px-6 py-12 bg-brand-cream">
+      <div className="relative flex flex-col items-center justify-center px-6 py-12 bg-brand-cream paisley">
         <motion.form
           onSubmit={onSubmit}
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
-          className="w-full max-w-md"
+          {...formEnter}
+          className="relative z-10 w-full max-w-md"
         >
           <Link to="/" className="lg:hidden flex items-center gap-2 mb-10">
             <div className="h-9 w-9 rounded-xl bg-brand-primary grid place-items-center">

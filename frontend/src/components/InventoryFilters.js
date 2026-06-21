@@ -33,7 +33,7 @@ export default function InventoryFilters({
   onSubmit,
 }) {
   return (
-    <div className="bg-surface border border-line rounded-2xl p-5 flex flex-col gap-4">
+    <div className="glass rounded-2xl p-5 flex flex-col gap-4">
       <form onSubmit={onSubmit} className="flex flex-wrap items-center gap-3">
         <div className="relative flex-1 min-w-[200px]">
           <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted" />

@@ -71,6 +71,18 @@ See `/app/memory/test_credentials.md`. Admin: `admin@inventory.com / Admin@12345
   - **Test hygiene**: credentials now from env (`TEST_ADMIN_EMAIL` / `TEST_ADMIN_PASSWORD` / `TEST_USER_PASSWORD`).
   - **Verified**: 43/43 backend tests passing (original 37 + 6 new cookie/logout/role_overridden tests).
 
+### Visual refresh — Street Market + Glassmorphism (2026-06-21)
+  - **Palette swap**: chutney green `#3A7D44` (primary) + turmeric yellow `#E4A11B` (accent) + clay terracotta `#B0533C` + khadi indigo `#1F2A40` (dark surface) + kulhad cream `#F7EFE0` (background). Status colors retuned to harmonize (safe=chutney, near=turmeric, critical=clay, expired=sindoor).
+  - **Typography**: Display switched to **Anek Devanagari** (variable, Latin+Devanagari personality), body to **Mukta** (Indian-designed sans), data mono kept as JetBrains Mono.
+  - **Subtle paisley watermark**: SVG buta pattern in two variants (`.paisley` for light surfaces in terracotta; `.paisley-soft` for dark surfaces in cream). Applied globally to dashboard layout background, hero, auth pages, sidebar.
+  - **Glassmorphism utilities**: `.glass`, `.glass-strong`, `.glass-dark`, `.glass-pill` — frosted backdrop-blur cards replace all `bg-surface border border-line` data cards across the app via one bulk substitution.
+  - **Hindi accent**: "ताज़ा" added to hero eyebrow chip; mobile theme color updated to khadi indigo.
+  - **Hero color**: radial gradients re-tuned to chutney/turmeric/clay (replacing previous green/lime), creating a sunset-bazaar feel.
+  - **Verified live**: full login → dashboard flow renders correctly on the canonical preview URL with KPI tiles, glass cards, paisley watermark, and Indian sample data (Haldiram Bhujia, MTR Sambar, Amul Butter, Parle-G, Tata Tea Gold, Maggi Masala, Vicco Turmeric, Britannia Cake, Mother Dairy Lassi).
+  - **Lint clean** (frontend + backend). No backend changes.
+
+  **Note on REACT_APP_BACKEND_URL**: the canonical preview slug `inventory-ai-69.preview.emergentagent.com` is now in `frontend/.env`. Cookie-based auth requires the frontend page and the API to share the exact same host (same-origin) so cookies attach to subsequent axios requests. Tested OK end-to-end on this canonical URL.
+
 ### Code review pass 2 (2026-06-19)
   - **ScanPage decomposed**: 356 → **95 lines** (-73%). Logic extracted into `useCameraCapture()` and `useOcrProcessor()` custom hooks; UI into `CameraPanel` / `ScanResults` / `ConfidenceBar` / `VerifyForm` subcomponents. Magic numbers (`800x600`, `0.85`) named.
   - **LandingPage decomposed**: 352 → **36 lines** (-90%). Split into `LandingNav`, `LandingHero`, `ImpactStats`, `Features`, `HowItWorks`, `CallToAction`, `LandingFooter`.

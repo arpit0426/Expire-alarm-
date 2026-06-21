@@ -164,7 +164,7 @@ function VerifyForm({ form, setForm, onSave, saving }) {
 
 export default function ScanResults({ ocr, processing, form, setForm, onSave, saving }) {
   return (
-    <div className="bg-surface border border-line rounded-2xl p-5 sm:p-6">
+    <div className="glass rounded-2xl p-5 sm:p-6">
       <div className="font-mono text-[11px] uppercase tracking-[0.18em] text-ink-muted mb-4">
         / 02 — Verify &amp; save
       </div>

@@ -23,7 +23,7 @@ export default function CameraPanel({
   const fileRef = React.useRef(null);
 
   return (
-    <div className="bg-surface border border-line rounded-2xl p-5 sm:p-6">
+    <div className="glass rounded-2xl p-5 sm:p-6">
       <div className="font-mono text-[11px] uppercase tracking-[0.18em] text-ink-muted mb-4">
         / 01 — Capture
       </div>
@@ -128,7 +128,7 @@ function CameraControls({
         <button
           data-testid="retake-btn"
           onClick={onReset}
-          className="inline-flex items-center justify-center gap-2 bg-brand-cream border border-line text-ink font-semibold px-4 py-3 rounded-full hover:border-brand-primary"
+          className="inline-flex items-center justify-center gap-2 bg-brand-cream border border-line text-ink font-semibold px-4 py-3 rounded-full hover:border-brand-primary/50 hover:bg-white/70"
         >
           <RotateCcw className="h-4 w-4" /> Retake
         </button>
@@ -147,7 +147,7 @@ function CameraControls({
         </button>
         <button
           onClick={onStopCamera}
-          className="inline-flex items-center justify-center gap-2 bg-surface border border-line text-ink-soft font-semibold px-4 py-3 rounded-full hover:bg-line/30"
+          className="inline-flex items-center justify-center gap-2 glass text-ink-soft font-semibold px-4 py-3 rounded-full hover:bg-line/30"
         >
           <CameraOff className="h-4 w-4" /> Stop
         </button>
@@ -166,7 +166,7 @@ function CameraControls({
       <button
         data-testid="upload-image-btn"
         onClick={() => fileRef.current?.click()}
-        className="inline-flex items-center justify-center gap-2 bg-surface border border-line text-ink font-semibold px-4 py-3 rounded-full hover:border-brand-primary"
+        className="inline-flex items-center justify-center gap-2 glass text-ink font-semibold px-4 py-3 rounded-full hover:border-brand-primary/50 hover:bg-white/70"
       >
         <Upload className="h-4 w-4" /> Upload image
       </button>

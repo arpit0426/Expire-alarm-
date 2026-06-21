@@ -102,7 +102,7 @@ export function Features() {
             <motion.div
               key={f.title}
               {...fadeInScrollStaggered(idx)}
-              className="group relative bg-surface border border-line rounded-3xl p-7 hover:-translate-y-1 hover:shadow-soft transition"
+              className="group relative glass rounded-3xl p-7 hover:-translate-y-1 hover:shadow-soft transition"
               data-testid={`feature-card-${idx}`}
             >
               <div className="h-12 w-12 rounded-2xl bg-brand-primary/10 grid place-items-center mb-5 group-hover:bg-brand-primary group-hover:text-brand-accent transition">

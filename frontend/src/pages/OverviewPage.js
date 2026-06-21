@@ -86,7 +86,7 @@ export default function OverviewPage() {
           <Link
             to="/app/inventory"
             data-testid="overview-inventory-cta"
-            className="inline-flex items-center gap-2 bg-surface border border-line text-ink font-semibold px-5 py-3 rounded-full hover:border-brand-primary transition"
+            className="inline-flex items-center gap-2 glass text-ink font-semibold px-5 py-3 rounded-full hover:border-brand-primary/50 hover:bg-white/70 transition"
           >
             <Boxes className="h-4 w-4" /> Inventory
           </Link>
@@ -102,7 +102,7 @@ export default function OverviewPage() {
               key={k.key}
               {...fadeInKpi(i)}
               data-testid={`kpi-${k.key}`}
-              className="relative bg-surface border border-line rounded-2xl p-5 sm:p-6 overflow-hidden hover:-translate-y-0.5 hover:shadow-soft transition"
+              className="relative glass rounded-2xl p-5 sm:p-6 overflow-hidden hover:-translate-y-0.5 hover:shadow-soft transition"
             >
               <div className={`absolute -right-6 -top-6 h-24 w-24 rounded-full opacity-10 ${k.accent}`} />
               <div className="flex items-center gap-3 mb-4">
@@ -124,7 +124,7 @@ export default function OverviewPage() {
       {/* Two-column: Recent items + Recent alerts */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {/* Recent products */}
-        <div className="lg:col-span-2 bg-surface border border-line rounded-2xl p-6">
+        <div className="lg:col-span-2 glass rounded-2xl p-6">
           <div className="flex items-center justify-between mb-5">
             <div>
               <div className="font-mono text-[11px] uppercase tracking-[0.18em] text-ink-muted">
@@ -167,7 +167,7 @@ export default function OverviewPage() {
         </div>
 
         {/* Alerts */}
-        <div className="bg-surface border border-line rounded-2xl p-6">
+        <div className="glass rounded-2xl p-6">
           <div className="flex items-center justify-between mb-5">
             <div>
               <div className="font-mono text-[11px] uppercase tracking-[0.18em] text-ink-muted">

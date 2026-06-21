@@ -74,7 +74,7 @@ export default function AlertsPage() {
               data-testid="rescan-alerts-btn"
               onClick={rescan}
               disabled={scanning}
-              className="inline-flex items-center gap-2 bg-surface border border-line text-ink font-semibold px-5 py-3 rounded-full hover:border-brand-primary disabled:opacity-60"
+              className="inline-flex items-center gap-2 glass text-ink font-semibold px-5 py-3 rounded-full hover:border-brand-primary/50 hover:bg-white/70 disabled:opacity-60"
             >
               <RefreshCw className={`h-4 w-4 ${scanning ? "animate-spin" : ""}`} /> Re-scan inventory
             </button>
@@ -89,7 +89,7 @@ export default function AlertsPage() {
         </div>
       </div>
 
-      <div className="bg-surface border border-line rounded-2xl p-6">
+      <div className="glass rounded-2xl p-6">
         {loading ? (
           <div className="py-10 text-center font-mono text-sm text-ink-muted">Loading…</div>
         ) : alerts.length === 0 ? (

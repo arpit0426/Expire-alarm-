@@ -137,7 +137,7 @@ export default function InventoryPage() {
             <button
               data-testid="export-excel-btn"
               onClick={onExport}
-              className="inline-flex items-center gap-2 bg-surface border border-line text-ink font-semibold px-5 py-3 rounded-full hover:border-brand-primary transition"
+              className="inline-flex items-center gap-2 glass text-ink font-semibold px-5 py-3 rounded-full hover:border-brand-primary/50 hover:bg-white/70 transition"
             >
               <FileDown className="h-4 w-4" /> Export
             </button>
@@ -163,7 +163,7 @@ export default function InventoryPage() {
         onSubmit={onSearchSubmit}
       />
 
-      <div className="bg-surface border border-line rounded-2xl overflow-hidden">
+      <div className="glass rounded-2xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead className="bg-brand-cream border-b border-line">

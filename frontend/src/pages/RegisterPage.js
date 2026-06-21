@@ -40,7 +40,7 @@ export default function RegisterPage() {
 
   return (
     <div className="min-h-screen grid lg:grid-cols-2" data-testid="register-page">
-      <div className="relative bg-brand-primary text-brand-cream hidden lg:block grain overflow-hidden">
+      <div className="relative bg-brand-primary text-brand-cream hidden lg:block grain paisley-soft overflow-hidden">
         <div className="absolute -top-32 -right-20 w-[500px] h-[500px] rounded-full bg-brand-accent/30 blur-3xl" />
         <div className="absolute bottom-0 left-0 w-[400px] h-[400px] rounded-full bg-brand-dark/40 blur-3xl" />
         <div className="relative h-full flex flex-col p-12 xl:p-16">
@@ -68,7 +68,7 @@ export default function RegisterPage() {
         </div>
       </div>
 
-      <div className="flex flex-col items-center justify-center px-6 py-12 bg-brand-cream">
+      <div className="relative flex flex-col items-center justify-center px-6 py-12 bg-brand-cream paisley">
         <motion.form
           onSubmit={onSubmit}
           {...formEnter}

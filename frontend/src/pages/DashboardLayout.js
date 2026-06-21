@@ -76,7 +76,9 @@ export default function DashboardLayout() {
   };
 
   return (
-    <div className="min-h-screen flex bg-brand-cream" data-testid="dashboard-layout">
+    <div className="relative min-h-screen flex bg-brand-cream" data-testid="dashboard-layout">
+      {/* Background paisley watermark */}
+      <div className="paisley pointer-events-none fixed inset-0 opacity-60 z-0" aria-hidden="true" />
       {/* Mobile top bar */}
       <div className="lg:hidden fixed top-0 inset-x-0 z-30 bg-brand-dark text-brand-cream flex items-center justify-between px-4 py-3">
         <Link to="/app" className="flex items-center gap-2">
@@ -98,7 +100,7 @@ export default function DashboardLayout() {
 
       {/* Sidebar */}
       <aside
-        className={`fixed lg:sticky lg:top-0 inset-y-0 left-0 z-40 w-72 bg-brand-dark text-brand-cream flex-shrink-0 flex flex-col p-5 transition-transform duration-300 lg:translate-x-0 lg:h-screen ${
+        className={`fixed lg:sticky lg:top-0 inset-y-0 left-0 z-40 w-72 bg-brand-dark text-brand-cream flex-shrink-0 flex flex-col p-5 transition-transform duration-300 lg:translate-x-0 lg:h-screen paisley-soft border-r border-line/10 ${
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         }`}
         data-testid="sidebar"
@@ -169,7 +171,7 @@ export default function DashboardLayout() {
       )}
 
       {/* Content */}
-      <main className="flex-1 pt-16 lg:pt-0 min-w-0">
+      <main className="flex-1 pt-16 lg:pt-0 min-w-0 relative z-10">
         <div className="max-w-7xl mx-auto px-5 sm:px-10 py-8 sm:py-12">
           <Outlet />
         </div>

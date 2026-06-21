@@ -157,7 +157,7 @@ export default function ReportsPage() {
 
 function ChartCard({ title, children }) {
   return (
-    <div className="bg-surface border border-line rounded-2xl p-6">
+    <div className="glass rounded-2xl p-6">
       <div className="font-mono text-[11px] uppercase tracking-[0.18em] text-ink-muted mb-3">
         / {title}
       </div>
@@ -168,7 +168,7 @@ function ChartCard({ title, children }) {
 
 function ListCard({ title, items, variant }) {
   return (
-    <div className="bg-surface border border-line rounded-2xl p-6">
+    <div className="glass rounded-2xl p-6">
       <div className="flex items-center justify-between mb-4">
         <div className="font-mono text-[11px] uppercase tracking-[0.18em] text-ink-muted">/ {title}</div>
         {variant === "expired" && (

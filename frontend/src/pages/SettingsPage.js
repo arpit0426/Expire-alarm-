@@ -78,7 +78,7 @@ export default function SettingsPage() {
       </div>
 
       {/* Thresholds */}
-      <div className="bg-surface border border-line rounded-2xl p-6">
+      <div className="glass rounded-2xl p-6">
         <div className="flex items-center gap-3 mb-5">
           <div className="h-10 w-10 rounded-xl bg-brand-primary/10 grid place-items-center">
             <SlidersHorizontal className="h-5 w-5 text-brand-primary" />
@@ -149,7 +149,7 @@ export default function SettingsPage() {
 
       {/* Users (admin only) */}
       {isAdmin && (
-        <div className="bg-surface border border-line rounded-2xl p-6">
+        <div className="glass rounded-2xl p-6">
           <div className="flex items-center gap-3 mb-5">
             <div className="h-10 w-10 rounded-xl bg-brand-accent/30 grid place-items-center">
               <UserCog className="h-5 w-5 text-brand-dark" />
