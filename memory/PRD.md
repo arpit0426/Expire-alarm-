@@ -71,6 +71,15 @@ See `/app/memory/test_credentials.md`. Admin: `admin@inventory.com / Admin@12345
   - **Test hygiene**: credentials now from env (`TEST_ADMIN_EMAIL` / `TEST_ADMIN_PASSWORD` / `TEST_USER_PASSWORD`).
   - **Verified**: 43/43 backend tests passing (original 37 + 6 new cookie/logout/role_overridden tests).
 
+### Hardening pass — bulletproof against "black screen" after login (2026-06-21)
+  - **api.js base URL**: now `window.location.origin + "/api"` (same-origin) so cookie-based auth works regardless of which preview slug the user lands on (old `c0793a4a-…` vs canonical `inventory-ai-69.…` both work transparently).
+  - **CSS defense-in-depth**: `html`, `body`, `#root` now have explicit `background-color: #f7efe0` so the page can never momentarily show OS / browser default dark while React boots or routes transition.
+  - **Backdrop-filter fallback**: `@supports not (backdrop-filter…)` rule forces `.glass*` to fully opaque white (or `#1f2a40` for `.glass-dark`) on older Safari/Android that don't support backdrop-filter. Cards stay readable everywhere.
+  - **Dashboard root explicit bg**: inline `style={{ backgroundColor: "#F7EFE0" }}` on the dashboard root for absolute insurance against an unloaded Tailwind class.
+  - **Mobile theme-color**: light cream by default, dark indigo only when the OS prefers dark — keeps the mobile URL-bar friendly to the cream UI.
+  - **Loading state visual**: the `Protected` route's "Loading workspace…" screen now shows a branded chutney-green chip + pulsing turmeric dot on cream + paisley, so the brief auth-check moment is unambiguously a "loading" state, not a "broken" one.
+  - **Verified**: all 6 post-login pages (Overview, Inventory, Scan, Alerts, Reports, Settings) confirmed rendering `rgb(247, 239, 224)` on both `body` and dashboard root via headless browser checks. Backend `/health`, `/auth/login`, `/auth/me`, `/dashboard/summary` all green.
+
 ### Visual refresh — Street Market + Glassmorphism (2026-06-21)
   - **Palette swap**: chutney green `#3A7D44` (primary) + turmeric yellow `#E4A11B` (accent) + clay terracotta `#B0533C` + khadi indigo `#1F2A40` (dark surface) + kulhad cream `#F7EFE0` (background). Status colors retuned to harmonize (safe=chutney, near=turmeric, critical=clay, expired=sindoor).
   - **Typography**: Display switched to **Anek Devanagari** (variable, Latin+Devanagari personality), body to **Mukta** (Indian-designed sans), data mono kept as JetBrains Mono.

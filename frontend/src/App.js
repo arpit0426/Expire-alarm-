@@ -19,8 +19,18 @@ function Protected({ children }) {
   const location = useLocation();
   if (loading) {
     return (
-      <div className="h-screen w-screen flex items-center justify-center bg-brand-cream">
-        <div className="font-mono text-sm text-ink-muted animate-pulse_dot">Loading workspace…</div>
+      <div
+        className="h-screen w-screen flex items-center justify-center bg-brand-cream paisley"
+        style={{ backgroundColor: "#F7EFE0" }}
+      >
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-12 w-12 rounded-2xl bg-brand-primary grid place-items-center shadow-glow">
+            <span className="h-3 w-3 rounded-full bg-brand-accent animate-pulse_dot" />
+          </div>
+          <div className="font-mono text-xs uppercase tracking-[0.2em] text-ink-soft">
+            Loading workspace…
+          </div>
+        </div>
       </div>
     );
   }

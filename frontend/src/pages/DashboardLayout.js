@@ -76,9 +76,9 @@ export default function DashboardLayout() {
   };
 
   return (
-    <div className="relative min-h-screen flex bg-brand-cream" data-testid="dashboard-layout">
-      {/* Background paisley watermark */}
-      <div className="paisley pointer-events-none fixed inset-0 opacity-60 z-0" aria-hidden="true" />
+    <div className="relative min-h-screen flex bg-brand-cream" data-testid="dashboard-layout" style={{ backgroundColor: "#F7EFE0" }}>
+      {/* Background paisley watermark – z-0 means it can never sit above content */}
+      <div className="paisley pointer-events-none fixed inset-0 z-0" aria-hidden="true" />
       {/* Mobile top bar */}
       <div className="lg:hidden fixed top-0 inset-x-0 z-30 bg-brand-dark text-brand-cream flex items-center justify-between px-4 py-3">
         <Link to="/app" className="flex items-center gap-2">
